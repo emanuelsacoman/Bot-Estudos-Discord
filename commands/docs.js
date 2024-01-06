@@ -36,6 +36,11 @@ const row = new ActionRowBuilder()
                 value: "discordjs"
             },
             {
+                label: "Git",
+                description: "Veja a documentação do Git",
+                value: "git"
+            },
+            {
                 label: "Go",
                 description: "Veja a documentação do Go",
                 value: "go"

@@ -54,6 +54,7 @@ const selectedOptions = {
     kotlin: "Documentação do Kotlin: https://kotlinlang.org/docs/home.html",
     ruby: "Documentação do Ruby: https://www.ruby-lang.org/pt/documentation/",
     swift: "Documentação do Swift: https://swift.org/documentation/",
+    git: "Documentação do Git: https://git-scm.com/docs/git/pt_BR",
 };
 
 const docsCommand = require('./commands/docs');
