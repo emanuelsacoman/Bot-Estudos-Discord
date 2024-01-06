@@ -4,7 +4,6 @@ const exampleEmbed = new EmbedBuilder()
 	.setColor("Orange")
 	.setTitle("Comandos do Git")
 	.addFields(
-        { name: '\u200B', value: '\u200B' },
 		{ name: '$ git init [nome-do-projeto]', value: 'Cria um novo repositório local com um nome especificado', inline: true },
 		{ name: '$ git clone [url]', value: 'Baixa um projeto e seu histórico de versão inteiro', inline: true },
 		{ name: '$ git stash', value: 'Armazena temporariamente todos os arquivos monitorados modificados', inline: true },

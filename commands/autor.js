@@ -11,7 +11,7 @@ const exampleEmbed = new EmbedBuilder()
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("autor")
-        .setDescription("Será que quem fez o CodeBucket é bonito?"),
+        .setDescription("Será que ele é bonito?"),
 
     async execute(interaction) {
         await interaction.reply({ embeds: [exampleEmbed] })

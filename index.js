@@ -1,5 +1,7 @@
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js')
 
+const cooldowns = new Collection();
+
 // dotenv
 const dotenv = require('dotenv')
 dotenv.config()
@@ -54,35 +56,67 @@ const selectedOptions = {
     swift: "Documentação do Swift: https://swift.org/documentation/",
 };
 
+const docsCommand = require('./commands/docs');
+client.commands.set(docsCommand.data.name, docsCommand);
+
 // Listener de interações com o bot
-client.on(Events.InteractionCreate, async interaction =>{
-    if (interaction.isStringSelectMenu()){
+client.on(Events.InteractionCreate, async interaction => {
+    if (interaction.isStringSelectMenu()) {
         const selected = interaction.values[0];
         const selectedOption = selectedOptions[selected];
-        if (selectedOption) {
-            await interaction.reply(selectedOption);
-        } else {
-            await interaction.reply("Opção não reconhecida.");
-        }
-        
-        try {
-            await interaction.deferUpdate();
-        } catch (error) {
-            console.error("Erro ao deferir a atualização:", error);
-        }
-    }
-    if (!interaction.isChatInputCommand()) return
-    const command = interaction.client.commands.get(interaction.commandName)
-    if (!command) {
-        console.error("Comando não encontrado")
-        return
-    }
-    try {
-        await command.execute(interaction)
-    } 
-    catch (error) {
-        console.error(error)
-        await interaction.reply("Houve um erro ao executar esse comando!")
-    }
-})
 
+        if (selectedOption) {
+            try {
+                await interaction.reply(selectedOption);
+                //await interaction.deferUpdate();
+            } catch (error) {
+                console.error("Erro ao responder/atualizar a interação:", error);
+            }
+        } else {
+            try {
+                await interaction.reply("Opção não reconhecida.");
+                await interaction.deferUpdate();
+            } catch (error) {
+                console.error("Erro ao responder/atualizar a interação:", error);
+            }
+        }
+    } else if (interaction.isCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command) {
+            console.error("Comando não encontrado");
+            return;
+        }
+
+        // Verificação de cooldown
+        if (!cooldowns.has(command.data.name)) {
+            cooldowns.set(command.data.name, new Collection());
+        }
+
+        const now = Date.now();
+        const timestamps = cooldowns.get(command.data.name);
+        const cooldownAmount = (command.data.cooldown || 10) * 1000;
+
+        if (timestamps.has(interaction.user.id)) {
+            const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
+
+            if (now < expirationTime) {
+                const timeLeft = (expirationTime - now) / 1000;
+                await interaction.reply({
+                    content: `:anger: Por favor, espere **${timeLeft.toFixed(1)}** segundos antes de usar o comando novamente.`,
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+
+        timestamps.set(interaction.user.id, now);
+        setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
+
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(error);
+            await interaction.reply("Houve um erro ao executar esse comando!");
+        }
+    }
+});
