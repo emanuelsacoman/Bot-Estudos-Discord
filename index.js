@@ -30,18 +30,45 @@ client.once(Events.ClientReady, c => {
 });
 client.login(TOKEN)
 
+// Linguagens para 'docs.js'
+const selectedOptions = {
+    angular: "Documentação do Angular: https://angular.io/docs",
+    csharp: "Documentação do C#: https://learn.microsoft.com/en-us/dotnet/csharp/",
+    cpp: "Documentação do C++: https://devdocs.io/cpp/",
+    css: "Documentação do CSS: https://developer.mozilla.org/en-US/docs/Web/CSS",
+    discordjs: "Documentação do Discord.js: https://discordjs.guide/#before-you-begin",
+    godot: "Documentação do Godot: https://docs.godotengine.org/en/stable/",
+    html: "Documentação do HTML: https://developer.mozilla.org/en-US/docs/Web/HTML",
+    ionic: "Documentação do Ionic: https://ionicframework.com/docs",
+    java: "Documentação do Java: https://docs.oracle.com/en/java/",
+    javascript: "Documentação do Javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+    python: "Documentação do Python: https://www.python.org",
+    react: "Documentação do React: https://reactjs.org/docs/getting-started.html",
+    typescript: "Documentação do TypeScript: https://www.typescriptlang.org/docs/",
+    unreal: "Documentação da Unreal Engine: https://docs.unrealengine.com/",
+    unity: "Documentação do Unity: https://learn.unity.com/",
+    dart: "Documentação do Dart: https://dart.dev/guides",
+    go: "Documentação do Go: https://golang.org/doc/",
+    kotlin: "Documentação do Kotlin: https://kotlinlang.org/docs/home.html",
+    ruby: "Documentação do Ruby: https://www.ruby-lang.org/pt/documentation/",
+    swift: "Documentação do Swift: https://swift.org/documentation/",
+};
+
 // Listener de interações com o bot
 client.on(Events.InteractionCreate, async interaction =>{
     if (interaction.isStringSelectMenu()){
-        const selected = interaction.values[0]
-        if (selected == "javascript"){
-            await interaction.reply("Documentação do Javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript")
-        } else if (selected == "python"){
-            await interaction.reply("Documentação do Python: https://www.python.org")
-        } else if (selected == "csharp"){
-            await interaction.reply("Documentação do C#: https://learn.microsoft.com/en-us/dotnet/csharp/")
-        } else if (selected == "discordjs"){
-            await interaction.reply("Documentação do Discord.js: https://discordjs.guide/#before-you-begin")
+        const selected = interaction.values[0];
+        const selectedOption = selectedOptions[selected];
+        if (selectedOption) {
+            await interaction.reply(selectedOption);
+        } else {
+            await interaction.reply("Opção não reconhecida.");
+        }
+        
+        try {
+            await interaction.deferUpdate();
+        } catch (error) {
+            console.error("Erro ao deferir a atualização:", error);
         }
     }
     if (!interaction.isChatInputCommand()) return
@@ -58,3 +85,4 @@ client.on(Events.InteractionCreate, async interaction =>{
         await interaction.reply("Houve um erro ao executar esse comando!")
     }
 })
+

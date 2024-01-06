@@ -21,11 +21,12 @@ const exampleEmbed = new EmbedBuilder()
 		{ name: '$ git push [alias] [branch]', value: 'Envia todos os commits do branch local para o GitHub', inline: true },
 		{ name: '$ git pull', value: 'Baixa o histórico e incorpora as mudanças', inline: true },
 	)
+	.setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("git")
-        .setDescription("Relembrar comandos do Git"),
+        .setDescription("Relembre comandos do Git"),
 
     async execute(interaction) {
         await interaction.reply({ embeds: [exampleEmbed] })
