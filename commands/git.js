@@ -21,6 +21,7 @@ const exampleEmbed = new EmbedBuilder()
 		{ name: '$ git pull', value: 'Baixa o histórico e incorpora as mudanças', inline: true },
 	)
 	.setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
+	.setTimestamp();
 
 module.exports = {
     data: new SlashCommandBuilder()

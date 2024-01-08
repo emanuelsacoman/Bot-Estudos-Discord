@@ -63,7 +63,7 @@ module.exports = {
                         const exampleEmbed = new EmbedBuilder()
                             .setColor('#ff090d')
                             .setTitle("Temporizador Finalizado")
-                            .setDescription(`Tempo de ${timeInSeconds} ${timeInSeconds !== 1 ? 'segundos' : 'segundo'} acabou para <@${interaction.user.id}>!`)
+                            .setDescription(`Temporizador de ${timeInSeconds} ${timeInSeconds !== 1 ? 'segundos' : 'segundo'} acabou para <@${interaction.user.id}>!`)
                             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                             .setTimestamp();
                             
@@ -93,7 +93,7 @@ module.exports = {
                         const exampleEmbed = new EmbedBuilder()
                             .setColor('#ff090d')
                             .setTitle("Temporizador Finalizado")
-                            .setDescription(`Tempo de ${timeInMinutes} ${timeInMinutes !== 1 ? 'minutos' : 'minuto'} acabou para <@${interaction.user.id}>!`)
+                            .setDescription(`Temporizador de ${timeInMinutes} ${timeInMinutes !== 1 ? 'minutos' : 'minuto'} acabou para <@${interaction.user.id}>!`)
                             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                             .setTimestamp();
                             
@@ -122,7 +122,7 @@ module.exports = {
                         const exampleEmbed = new EmbedBuilder()
                             .setColor('#ff090d')
                             .setTitle("Temporizador Finalizado")
-                            .setDescription(`Tempo de ${timeInHours} ${timeInHours !== 1 ? 'horas' : 'hora'} acabou para <@${interaction.user.id}>!`)
+                            .setDescription(`Temporizador de ${timeInHours} ${timeInHours !== 1 ? 'horas' : 'hora'} acabou para <@${interaction.user.id}>!`)
                             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                             .setTimestamp();
                             
