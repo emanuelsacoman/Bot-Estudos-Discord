@@ -455,7 +455,7 @@ module.exports = {
         const linguagemMaiuscula = linguagem.toUpperCase(); // Convertendo para maiúsculas
         
         const exampleEmbed = new EmbedBuilder()
-            .setColor("Blue")
+            .setColor('#ff9c00')
             .setTitle(`Exercício de ${linguagemMaiuscula}`)
             .setDescription(`${exercicio}`)
             .setFooter({text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png'})
