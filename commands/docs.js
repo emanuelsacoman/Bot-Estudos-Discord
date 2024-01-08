@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, Component } = require("discord.js")
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, Component, EmbedBuilder } = require("discord.js")
 
 const row = new ActionRowBuilder()
     .addComponents(
@@ -120,6 +120,13 @@ module.exports = {
         .setDescription("Acesse a documentação da tecnologia que quiser"),
 
     async execute(interaction) {
-        await interaction.reply({content: "Selecione uma das techs abaixo:", components: [row]})
+        const exampleEmbed = new EmbedBuilder()
+            .setColor('#ff9c00')
+            .setTitle("Documentação")
+            .setDescription("Escolha a tecnologia para acessar sua documentação. :arrow_down:")
+            .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
+            .setTimestamp();
+
+            await interaction.reply({embeds: [exampleEmbed], components: [row] });
     }
 }

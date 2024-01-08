@@ -17,6 +17,8 @@ for (const file of commandFiles){
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
+
+
 (async () => {
     try {
         console.log(`Resetando ${commands.length} comandos...`);
@@ -30,3 +32,5 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
         console.error(error);
     }
 })();
+
+
