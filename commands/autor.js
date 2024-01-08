@@ -13,11 +13,22 @@ module.exports = {
         .setName("autor")
         .setDescription("Será que ele é bonito?"),
 
-    async execute(interaction) {
-        const emojis = ['😄', '😊', '😎', '😇', '🥳', '😍', '🤩', '😅', '😳', '😏', '🙈', '😈', '🤓', '🤠', '😘', '😴'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)]; // Selecionar um emoji aleatório
-
-        const message = await interaction.reply({ embeds: [exampleEmbed], fetchReply: true })
-        message.react(randomEmoji); 
-    }
+        async execute(interaction) {
+            const emojis = ['😄', '😊', '😎', '🥳', '🤩', '🙈','😀', '😃', '😁', '😆', '😅', '😂', '🤣', '😊',
+            '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰','😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪',
+            '🤨', '🧐', '🤓', '😏','😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '😢',
+            '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔',
+            '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤',
+            '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺',
+            '🤡', '👻', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'];
+            const message = await interaction.reply({ embeds: [exampleEmbed], fetchReply: true })
+                .catch(console.error);
+        
+            if (message) {
+                for (let i = 0; i < 3; i++) {
+                    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    await message.react(randomEmoji);
+                }
+            }
+        }        
 }
