@@ -14,6 +14,10 @@ module.exports = {
         .setDescription("Será que ele é bonito?"),
 
     async execute(interaction) {
-        await interaction.reply({ embeds: [exampleEmbed] })
+        const emojis = ['😄', '😊', '😎', '😇', '🥳', '😍', '🤩', '😅', '😳', '😏', '🙈', '😈', '🤓', '🤠', '😘', '😴'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)]; // Selecionar um emoji aleatório
+
+        const message = await interaction.reply({ embeds: [exampleEmbed], fetchReply: true })
+        message.react(randomEmoji); 
     }
 }
