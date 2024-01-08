@@ -436,7 +436,7 @@ function gerarExercicio(linguagem) {
         }
     }
 
-    return "Linguagem não suportada ou sem exercícios cadastrados para essa linguagem.";
+    return "~~Linguagem não suportada ou sem exercícios cadastrados para essa linguagem.~~";
 }
 
 module.exports = {
