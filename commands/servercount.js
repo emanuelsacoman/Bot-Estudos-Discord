@@ -3,7 +3,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js")
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("servercount")
-        .setDescription("Descubra em quantos servidores CodeBucket está presente!"),
+        .setDescription("Em quantos servidores CodeBucket está?"),
 
     async execute(interaction){
         // Pode-se obter a contagem de servidores do bot através do client/bot

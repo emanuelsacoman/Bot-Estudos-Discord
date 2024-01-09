@@ -117,7 +117,7 @@ const row = new ActionRowBuilder()
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("docs")
-        .setDescription("Acesse a documentação da tecnologia que quiser"),
+        .setDescription("Acesse as documentações que quiser"),
 
     async execute(interaction) {
         const exampleEmbed = new EmbedBuilder()
