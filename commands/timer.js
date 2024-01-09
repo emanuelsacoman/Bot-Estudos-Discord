@@ -62,7 +62,7 @@ module.exports = {
                         .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                         .setTimestamp();
                     
-                    const followUpMessage = await interaction.followUp({content: `<@${interaction.user.id}>`, embeds: [exampleEmbed] });
+                    const followUpMessage = await interaction.followUp({content: `||<@${interaction.user.id}>||`, embeds: [exampleEmbed] });
                     await followUpMessage.react('⏰');
                     
                     delete timers[interaction.user.id];
