@@ -1,7 +1,7 @@
 const { REST, Routes } = require("discord.js");
 const dotenv = require('dotenv');
 dotenv.config();
-const { TOKEN, CLIENT_ID, GUILD_ID } = process.env;
+const { TOKEN, CLIENT_ID } = process.env;
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -17,20 +17,17 @@ for (const file of commandFiles){
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
-
-
 (async () => {
     try {
         console.log(`Resetando ${commands.length} comandos...`);
 
-        // Correção do trecho onde é feita a chamada para enviar os comandos
-        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        // Registrando comandos globalmente para o bot
+        await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
         
-        console.log("Comandos registrados com sucesso!");
+        console.log("Comandos registrados com sucesso de forma global!");
     }
     catch(error) {
         console.error(error);
     }
 })();
-
 
