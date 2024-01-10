@@ -32,7 +32,7 @@ client.once('ready', () => {
     console.log(`${client.user.tag} foi iniciado em:`);
 
     client.guilds.cache.forEach(guild => {
-        console.log(`Nome do servidor: ${guild.name} | ID do servidor: ${guild.id} | Membros: ${guild.memberCount}`);
+        console.log(`Nome do servidor: ${guild.name} | ID: ${guild.id} | Membros: ${guild.memberCount}`);
     });
 
     console.log('\n');
