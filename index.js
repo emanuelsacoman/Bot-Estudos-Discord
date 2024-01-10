@@ -27,8 +27,24 @@ for (const file of commandFiles){
 }
 
 // Login do bot
-client.once(Events.ClientReady, c => {
-	console.log(`Pronto! Login realizado como ${c.user.tag}`)
+client.once('ready', () => {
+    console.log(`Pronto! Login realizado como ${client.user.tag}\n`);
+    console.log(`${client.user.tag} foi iniciado em:`);
+
+    client.guilds.cache.forEach(guild => {
+        console.log(`Nome do servidor: ${guild.name} | ID do servidor: ${guild.id} | Membros: ${guild.memberCount}`);
+    });
+
+    console.log('\n');
+    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
+});
+
+//avisa se alguém adicionar o bot
+client.on('guildCreate', guild => {
+    console.log(`O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id}).`);
+
+    console.log('\n');
+    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
 });
 client.login(TOKEN)
 
