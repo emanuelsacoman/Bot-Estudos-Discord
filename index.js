@@ -78,62 +78,74 @@ client.commands.set(docsCommand.data.name, docsCommand);
 
 // Listener de interações com o bot
 client.on(Events.InteractionCreate, async interaction => {
-    if (interaction.isStringSelectMenu()) {
-        const selected = interaction.values[0];
-        const selectedOption = selectedOptions[selected];
+    try {
+        if (interaction.isStringSelectMenu()) {
+            const selected = interaction.values[0];
+            const selectedOption = selectedOptions[selected];
 
-        if (selectedOption) {
-            try {
-                await interaction.reply(selectedOption);
-                //await interaction.deferUpdate();
-            } catch (error) {
-                console.error("Erro ao responder/atualizar a interação:", error);
+            if (selectedOption) {
+                try {
+                    await interaction.reply(selectedOption);
+                    // await interaction.deferUpdate();
+                } catch (error) {
+                    console.error("Erro ao responder/atualizar a interação:", error);
+                }
+            } else {
+                try {
+                    await interaction.reply("Opção não reconhecida.");
+                    // await interaction.deferUpdate();
+                } catch (error) {
+                    console.error("Erro ao responder/atualizar a interação:", error);
+                }
             }
-        } else {
-            try {
-                await interaction.reply("Opção não reconhecida.");
-                await interaction.deferUpdate();
-            } catch (error) {
-                console.error("Erro ao responder/atualizar a interação:", error);
-            }
-        }
-    } else if (interaction.isCommand()) {
-        const command = client.commands.get(interaction.commandName);
-        if (!command) {
-            console.error("Comando não encontrado");
-            return;
-        }
-
-        // Verificação de cooldown
-        if (!cooldowns.has(command.data.name)) {
-            cooldowns.set(command.data.name, new Collection());
-        }
-
-        const now = Date.now();
-        const timestamps = cooldowns.get(command.data.name);
-        const cooldownAmount = (command.data.cooldown || 5) * 1000;
-
-        if (timestamps.has(interaction.user.id)) {
-            const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
-
-            if (now < expirationTime) {
-                const timeLeft = (expirationTime - now) / 1000;
-                await interaction.reply({
-                    content: `:anger: Por favor, espere **${timeLeft.toFixed(1)}** segundos antes de usar o comando novamente.`,
-                    ephemeral: true
-                });
+        } else if (interaction.isCommand()) {
+            const command = client.commands.get(interaction.commandName);
+            if (!command) {
+                console.error("Comando não encontrado");
                 return;
             }
-        }
 
-        timestamps.set(interaction.user.id, now);
-        setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
+            // Verificação de cooldown
+            if (!cooldowns.has(command.data.name)) {
+                cooldowns.set(command.data.name, new Collection());
+            }
 
-        try {
-            await command.execute(interaction);
-        } catch (error) {
-            console.error(error);
-            await interaction.reply("Houve um erro ao executar esse comando!");
+            const now = Date.now();
+            const timestamps = cooldowns.get(command.data.name);
+            const cooldownAmount = (command.data.cooldown || 5) * 1000;
+
+            if (timestamps.has(interaction.user.id)) {
+                const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
+
+                if (now < expirationTime) {
+                    const timeLeft = (expirationTime - now) / 1000;
+                    try {
+                        await interaction.reply({
+                            content: `:anger: Por favor, espere **${timeLeft.toFixed(1)}** segundos antes de usar o comando novamente.`,
+                            ephemeral: true
+                        });
+                    } catch (error) {
+                        console.error("Erro ao responder/atualizar a interação:", error);
+                    }
+                    return;
+                }
+            }
+
+            timestamps.set(interaction.user.id, now);
+            setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
+
+            try {
+                await command.execute(interaction);
+            } catch (error) {
+                console.error(error);
+                try {
+                    await interaction.reply("Houve um erro ao executar esse comando!");
+                } catch (error) {
+                    console.error("Erro ao responder à interação de erro:", error);
+                }
+            }
         }
+    } catch (error) {
+        console.error("Erro geral na interação:", error);
     }
 });
