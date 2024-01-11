@@ -4,7 +4,7 @@ const axios = require("axios");
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("question")
-        .setDescription("Faz uma pergunta relacionada à programação (somente em inglês)")
+        .setDescription("Faz uma pergunta relacionada à programação")
         .addStringOption(option =>
             option.setName("pergunta")
                 .setDescription("A pergunta relacionada à programação (deve ser em inglês)")
@@ -33,8 +33,6 @@ module.exports = {
                 const answerLink = topResult.is_answered ? `\nResposta: \`${topResult.link}\`` : "";
 
                 // Responde ao usuário no Discord
-                //return interaction.reply(`Aqui está uma pergunta relacionada:\n\`${topResult.title}\`\nLink: \`${topResult.link}\`${answerLink}`);
-
                 const exampleEmbed = new EmbedBuilder()
                     .setColor('#ff9c00')
                     .setAuthor({ name: `Stack Overflow`, iconURL: `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`, url: `${topResult.link}` })

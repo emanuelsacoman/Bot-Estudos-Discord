@@ -25,7 +25,6 @@ module.exports = {
                     .setTitle(`Repositório de ${data.owner.login}`)
                     .setThumbnail(`${data.owner.avatar_url}`)
                     .addFields(
-                        { name: '\u200B', value: '\u200B' },
                         { name: 'Full Name 🤓', value: `${data.full_name}` || 'N/A', inline: true },
                         { name: 'Description 🌎', value: `${data.description}` || 'Sem descrição disponível.', inline: true },
                         { name: '\u200B', value: '\u200B' },
@@ -34,7 +33,6 @@ module.exports = {
                         { name: 'Forks 🍴', value: `${data.forks_count}` || '0', inline: true },
                         { name: 'URL', value: `${data.html_url}` || 'N/A' }
                     )
-                    .setDescription(`${data.description}` || 'Sem descrição disponível.')
                     .setURL(`${data.html_url}`)
                     .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                     .setTimestamp();

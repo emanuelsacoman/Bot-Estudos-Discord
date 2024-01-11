@@ -86,14 +86,12 @@ client.on(Events.InteractionCreate, async interaction => {
             if (selectedOption) {
                 try {
                     await interaction.reply(selectedOption);
-                    // await interaction.deferUpdate();
                 } catch (error) {
                     console.error("Erro ao responder/atualizar a interação:", error);
                 }
             } else {
                 try {
                     await interaction.reply("Opção não reconhecida.");
-                    // await interaction.deferUpdate();
                 } catch (error) {
                     console.error("Erro ao responder/atualizar a interação:", error);
                 }
