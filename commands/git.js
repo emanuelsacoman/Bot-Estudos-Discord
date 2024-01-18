@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js")
 
 const exampleEmbed = new EmbedBuilder()
-	.setColor("Orange")
+	.setColor('#ff9c00')
 	.setTitle("Comandos do Git")
 	.addFields(
 		{ name: '$ git init [nome-do-projeto]', value: 'Cria um novo repositório local com um nome especificado', inline: true },
