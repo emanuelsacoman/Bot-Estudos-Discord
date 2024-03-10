@@ -71,6 +71,7 @@ const selectedOptions = {
     ruby: "Documentação do Ruby: https://www.ruby-lang.org/pt/documentation/",
     swift: "Documentação do Swift: https://swift.org/documentation/",
     git: "Documentação do Git: https://git-scm.com/docs/git/pt_BR",
+    laravel: "Documentação do Laravel: https://laravel.com/docs/10.x/readme",
 };
 
 const docsCommand = require('./commands/docs');
