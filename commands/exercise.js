@@ -450,9 +450,9 @@ module.exports = {
 
     async execute(interaction) {
         const linguagem = interaction.options.getString('linguagem');
-        const exercicio = gerarExercicio(linguagem); // Supondo que essa função gere o exercício com base na linguagem
+        const exercicio = gerarExercicio(linguagem);
         
-        const linguagemMaiuscula = linguagem.toUpperCase(); // Convertendo para maiúsculas
+        const linguagemMaiuscula = linguagem.toUpperCase();
         
         const exampleEmbed = new EmbedBuilder()
             .setColor('#ff9c00')
