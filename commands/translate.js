@@ -30,7 +30,7 @@ module.exports = {
             await interaction.reply(`${textoTraduzido}`);
         } catch (error) {
             console.error('Erro ao traduzir texto:', error);
-            await interaction.reply('Ocorreu um erro ao traduzir o texto.');
+            await interaction.reply({ content: 'Ocorreu um erro ao traduzir o texto.', ephemeral: true });
         }
     },
 };
