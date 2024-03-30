@@ -4,14 +4,14 @@ const axios = require('axios');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('translate')
-        .setDescription('Traduz um texto para o idioma especificado.')
+        .setDescription('Traduz um texto para o idioma especificado')
         .addStringOption(option => 
             option.setName('idioma')
-                .setDescription('Idioma para o qual o texto será traduzido.')
+                .setDescription('Idioma para o qual o texto será traduzido')
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('texto')
-                .setDescription('Texto a ser traduzido.')
+                .setDescription('Texto a ser traduzido')
                 .setRequired(true)),
 
     async execute(interaction) {
