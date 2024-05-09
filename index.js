@@ -35,16 +35,16 @@ client.once('ready', () => {
         console.log(`Nome do servidor: ${guild.name} | ID: ${guild.id} | Membros: ${guild.memberCount}`);
     });
 
-    console.log('\n');
     console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
+    console.log('\n');
 });
 
 //avisa se alguém adicionar o bot
 client.on('guildCreate', guild => {
     console.log(`O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id}).`);
-
-    console.log('\n');
     console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
+    console.log(`Foi adicionado em: ${joinDate.toDateString()} ${joinDate.toTimeString()}`);
+    console.log('\n');
 });
 client.login(TOKEN)
 
@@ -72,6 +72,16 @@ const selectedOptions = {
     swift: "Documentação do Swift: https://swift.org/documentation/",
     git: "Documentação do Git: https://git-scm.com/docs/git/pt_BR",
     laravel: "Documentação do Laravel: https://laravel.com/docs/10.x/readme",
+    rust: "Documentação do Rust: https://doc.rust-lang.org/book/",
+    php: "Documentação do PHP: https://www.php.net/manual/en/",
+    vuejs: "Documentação do Vue.js: https://vuejs.org/v2/guide/",
+    jquery: "Documentação do jQuery: https://api.jquery.com/",
+    tensorflow: "Documentação do TensorFlow: https://www.tensorflow.org/guide",
+    pytorch: "Documentação do PyTorch: https://pytorch.org/docs/stable/index.html",
+    django: "Documentação do Django: https://docs.djangoproject.com/en/stable/",
+    flask: "Documentação do Flask: https://flask.palletsprojects.com/en/2.0.x/",
+    spring: "Documentação do Spring Framework: https://spring.io/projects/spring-framework",
+    aspnet: "Documentação do ASP.NET: https://dotnet.microsoft.com/apps/aspnet"
 };
 
 const docsCommand = require('./commands/docs');

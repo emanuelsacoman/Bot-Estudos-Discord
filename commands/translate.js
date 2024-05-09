@@ -7,7 +7,7 @@ module.exports = {
         .setDescription('Traduz um texto para o idioma especificado')
         .addStringOption(option => 
             option.setName('idioma')
-                .setDescription('Idioma para o qual o texto será traduzido')
+                .setDescription('Sigla do idioma para o qual o texto será traduzido')
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('texto')
