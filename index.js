@@ -151,5 +151,3 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error("Erro geral na interação:", error);
     }
 });
-
-//teste para ver se atualiza na hospedagem10
