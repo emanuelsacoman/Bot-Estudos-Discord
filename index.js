@@ -152,4 +152,4 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-//teste para ver se atualiza na hospedagem
+//teste para ver se atualiza na hospedagem2
