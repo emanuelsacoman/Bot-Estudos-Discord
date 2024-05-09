@@ -129,37 +129,7 @@ const row = new ActionRowBuilder()
                 label: "jQuery",
                 description: "Veja a documentação do jQuery",
                 value: "jquery"
-            },
-            {
-                label: "TensorFlow",
-                description: "Veja a documentação do TensorFlow",
-                value: "tensorflow"
-            },
-            {
-                label: "PyTorch",
-                description: "Veja a documentação do PyTorch",
-                value: "pytorch"
-            },
-            {
-                label: "Django",
-                description: "Veja a documentação do Django",
-                value: "django"
-            },
-            {
-                label: "Flask",
-                description: "Veja a documentação do Flask",
-                value: "flask"
-            },
-            {
-                label: "Spring Framework",
-                description: "Veja a documentação do Spring Framework",
-                value: "spring"
-            },
-            {
-                label: "ASP.NET",
-                description: "Veja a documentação do ASP.NET",
-                value: "aspnet"
-            }               
+            },            
             
             )
     )
