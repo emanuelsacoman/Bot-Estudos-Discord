@@ -5,7 +5,7 @@ const exampleEmbed = new EmbedBuilder()
 	.setTitle('Quem fez?')
 	.setDescription('**CodeBucket** é um projeto a nível acadêmico, feito por *Emanuel Vinícius Sacoman* (eu) em seus primeiros momentos no curso de Análise e Desenvolvimento de Sistemas, que tem como objetivo ajudar usuários a se familiarizarem com a utilização do Discord para estudos voltados para a área de programação básica.')
 	.setURL('https://github.com/emanuelsacoman')
-	.setFooter({ text: 'Emanuel', iconURL: 'https://portfolio-evs.netlify.app/imagens/selfie.jpg' })
+	.setFooter({ text: 'Emanuel', iconURL: 'https://avatars.githubusercontent.com/u/63565495?v=4' })
 	.setTimestamp();
 
 module.exports = {
