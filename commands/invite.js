@@ -10,7 +10,7 @@ module.exports = {
             .setColor('Blue')
             .setTitle('CLIQUE AQUI')
             .setDescription('O link enviará você até o convite do CodeBucket.')
-            .setURL('https://avatars.githubusercontent.com/u/63565495?v=4')
+            .setURL('https://discord.com/oauth2/authorize?client_id=1193011045577523300')
             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
             .setTimestamp();
         const message = await interaction.reply({ embeds: [exampleEmbed], fetchReply: true })
