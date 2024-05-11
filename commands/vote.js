@@ -13,10 +13,7 @@ module.exports = {
             .setURL('https://top.gg/bot/1193011045577523300')
             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
             .setTimestamp();
-
-        await interaction.reply({
-            embeds: [exampleEmbed],
-            components: [],
-        });
+        const message = await interaction.reply({ embeds: [exampleEmbed], fetchReply: true })
+        await message.react('⭐');
     }
 }
