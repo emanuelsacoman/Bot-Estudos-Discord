@@ -14,4 +14,6 @@ Atualmente o bot está presente na top.gg, o que significa que o bot tem relevâ
 
 ![alt text](topgg.png)
 
+![Discord Bots](https://top.gg/api/widget/upvotes/1193011045577523300.svg)
+
 > [Vote na top.gg!](https://top.gg/bot/1193011045577523300)
