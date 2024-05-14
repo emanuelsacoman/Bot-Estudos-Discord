@@ -1,21 +1,16 @@
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js')
-
 const cooldowns = new Collection();
-
 // dotenv
 const dotenv = require('dotenv')
 dotenv.config()
 const { TOKEN } = process.env
-
 // importação dos comandos
 const fs = require("node:fs")
 const path = require("node:path")
 const commandsPath = path.join(__dirname, "commands")
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"))
-
 const client = new Client({ intents: [GatewayIntentBits.Guilds] })
 client.commands = new Collection()
-
 for (const file of commandFiles){
     const filePath = path.join(commandsPath, file)
     const command = require(filePath)
@@ -25,28 +20,23 @@ for (const file of commandFiles){
         console.log(`Esse comando em ${filePath} está com "data" ou "execute ausentes"`)
     } 
 }
-
 // Login do bot
 client.once('ready', () => {
     console.log(`Pronto! Login realizado como ${client.user.tag}\n`);
     console.log(`${client.user.tag} foi iniciado em:`);
-
     client.guilds.cache.forEach(guild => {
         console.log(`Nome do servidor: ${guild.name} | ID: ${guild.id} | Membros: ${guild.memberCount}`);
     });
-
-    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
     console.log('\n');
+    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
 });
-
 //avisa se alguém adicionar o bot
 client.on('guildCreate', guild => {
     console.log(`O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id}).`);
-    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
     console.log('\n');
+    console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
 });
 client.login(TOKEN)
-
 // Linguagens para 'docs.js'
 const selectedOptions = {
     angular: "Documentação do Angular: https://angular.io/docs",
@@ -71,22 +61,16 @@ const selectedOptions = {
     swift: "Documentação do Swift: https://swift.org/documentation/",
     git: "Documentação do Git: https://git-scm.com/docs/git/pt_BR",
     laravel: "Documentação do Laravel: https://laravel.com/docs/10.x/readme",
-    rust: "Documentação do Rust: https://doc.rust-lang.org/book/",
-    php: "Documentação do PHP: https://www.php.net/manual/en/",
-    vuejs: "Documentação do Vue.js: https://vuejs.org/v2/guide/",
-    jquery: "Documentação do jQuery: https://api.jquery.com/",
 };
 
 const docsCommand = require('./commands/docs');
 client.commands.set(docsCommand.data.name, docsCommand);
-
 // Listener de interações com o bot
 client.on(Events.InteractionCreate, async interaction => {
     try {
         if (interaction.isStringSelectMenu()) {
             const selected = interaction.values[0];
             const selectedOption = selectedOptions[selected];
-
             if (selectedOption) {
                 try {
                     await interaction.reply(selectedOption);
@@ -106,19 +90,15 @@ client.on(Events.InteractionCreate, async interaction => {
                 console.error("Comando não encontrado");
                 return;
             }
-
             // Verificação de cooldown
             if (!cooldowns.has(command.data.name)) {
                 cooldowns.set(command.data.name, new Collection());
             }
-
             const now = Date.now();
             const timestamps = cooldowns.get(command.data.name);
             const cooldownAmount = (command.data.cooldown || 5) * 1000;
-
             if (timestamps.has(interaction.user.id)) {
                 const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
-
                 if (now < expirationTime) {
                     const timeLeft = (expirationTime - now) / 1000;
                     try {
@@ -132,10 +112,8 @@ client.on(Events.InteractionCreate, async interaction => {
                     return;
                 }
             }
-
             timestamps.set(interaction.user.id, now);
             setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
-
             try {
                 await command.execute(interaction);
             } catch (error) {
