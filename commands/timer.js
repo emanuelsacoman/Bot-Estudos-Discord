@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { DateTime } = require("luxon");
 
+// Objeto para armazenar os temporizadores ativos
 let timers = {};
 
 module.exports = {
@@ -11,9 +11,9 @@ module.exports = {
             subcommand
                 .setName("set")
                 .setDescription("Define um temporizador")
-                .addStringOption(option =>
-                    option.setName("horario")
-                        .setDescription("Horário no formato HH:MM (24 horas)")
+                .addIntegerOption(option =>
+                    option.setName("tempo")
+                        .setDescription("Apenas tempo em minutos")
                         .setRequired(true)
                 )
         )
@@ -28,74 +28,55 @@ module.exports = {
 
         const subcommand = interaction.options.getSubcommand();
 
-        if (subcommand === "set") {
-            const userId = interaction.user.id;
-            if (timers[userId]) {
-                await interaction.reply({ content: "Você já tem um temporizador ativo. Use */timer stop* para excluí-lo.", ephemeral: true });
-                return;
-            }
-            
-            const timeString = interaction.options.getString("horario");
-    
-            // Verifica se o formato do horário é válido (formato: HH:MM)
-            const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-            if (!timeRegex.test(timeString)) {
-                await interaction.reply("Formato de horário inválido. Use o formato 'HH:MM' (24 horas).");
-                return;
-            }
-    
-            const [hours, minutes] = timeString.split(":");
-            const now = DateTime.utc(); // Obtém a data e hora atual em UTC
-            const targetTime = DateTime.utc(now.year, now.month, now.day, hours, minutes);
-    
-            const timeDifference = targetTime.diff(now, 'milliseconds').milliseconds;
-            if (timeDifference <= 0) {
-                await interaction.reply({content: "O horário especificado já passou.", ephemeral: true});
-                return;
-            }
-    
-            timers[interaction.user.id] = setTimeout(async () => {
-                try {
-                    const exampleEmbed = new EmbedBuilder()
-                        .setColor('#ff090d')
-                        .setTitle("Temporizador Finalizado")
-                        .setDescription(`<@${interaction.user.id}>, trimtrimtrim!`)
-                        .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
-                        .setTimestamp();
-                    
-                    const followUpMessage = await interaction.followUp({content: `||<@${interaction.user.id}>||`, embeds: [exampleEmbed] });
-                    await followUpMessage.react('⏰');
-                    
+        try {
+            if (subcommand === "set") {
+                const tempoEmMinutos = interaction.options.getInteger("tempo");
+                const tempoEmMilissegundos = tempoEmMinutos * 60 * 1000;
+
+                const embed1 = new EmbedBuilder()
+                    .setColor('#00e903')
+                    .setTitle("Temporizador Iniciado")
+                    .setDescription(`Temporizador de <@${interaction.user.id}> definido para **${tempoEmMinutos} minuto(s)**!`)
+                    .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
+                    .setTimestamp();
+
+                const embed2 = new EmbedBuilder()
+                    .setColor('#ff090d')
+                    .setTitle("Temporizador Finalizado")
+                    .setDescription(`<@${interaction.user.id}>, trimtrimtrim!`)
+                    .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
+                    .setTimestamp();
+
+                // Se houver um temporizador anteriormente definido para o mesmo usuário, cancelá-lo
+                if (timers[interaction.user.id]) {
+                    clearTimeout(timers[interaction.user.id]);
                     delete timers[interaction.user.id];
-                } catch (error) {
-                    console.error("Erro ao enviar mensagem de tempo decorrido:", error);
                 }
-            }, timeDifference);
 
-            const exampleEmbed = new EmbedBuilder()
-                        .setColor('#00e903')
-                        .setTitle("Temporizador Iniciado")
-                        .setDescription(`Temporizador de <@${interaction.user.id}> definido para **${timeString}**`)
-                        .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
-                        .setTimestamp();
-                            
-                await interaction.reply({ embeds: [exampleEmbed] });
+                // Define o novo temporizador
+                timers[interaction.user.id] = setTimeout(() => {
+                    interaction.editReply({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
+                }, tempoEmMilissegundos);
 
-        } else if (subcommand === "stop") {
-            if (timers[interaction.user.id]) {
-                clearTimeout(timers[interaction.user.id]);
-                delete timers[interaction.user.id];
-                const exampleEmbed = new EmbedBuilder()
+                await interaction.reply({ content: `<@${interaction.user.id}>`, embeds: [embed1] });
+            } else if (subcommand === "stop") {
+                // Se houver um temporizador definido para o usuário, cancelá-lo
+                if (timers[interaction.user.id]) {
+                    clearTimeout(timers[interaction.user.id]);
+                    delete timers[interaction.user.id];
+                    const exampleEmbed = new EmbedBuilder()
                             .setColor('#ffff00')
                             .setTitle("Temporizador Excluído")
                             .setDescription(`<@${interaction.user.id}> finalizou seu próprio temporizador.`)
                             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                             .setTimestamp();
-                            
-                await interaction.reply({ embeds: [exampleEmbed] }); 
-            } else {
-                await interaction.reply({content: "Não há temporizador em execução.", ephemeral: true});
+                    await interaction.reply({ embeds: [exampleEmbed] });
+                } else {
+                    await interaction.reply("Não há temporizador em execução para você.");
+                }
             }
+        } catch (error) {
+            console.error(error);
         }
     }
 };
