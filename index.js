@@ -1,4 +1,4 @@
-const { Client, Events, GatewayIntentBits, Collection } = require('discord.js')
+const { Client, Events, GatewayIntentBits, Collection, Activity, ActivityType } = require('discord.js')
 
 const cooldowns = new Collection();
 
@@ -26,6 +26,22 @@ for (const file of commandFiles){
     } 
 }
 
+let status = [
+    {
+        name: "🎮",
+    },
+    {
+        name: "Vote no top.gg",
+        type: ActivityType.Watching,
+        link: "https://top.gg/bot/1193011045577523300"
+    },
+    {
+        name: "Slow Beats",
+        type: ActivityType.Listening,
+        link: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=0948ff034a394fba"
+    },
+]
+
 // Login do bot
 client.once('ready', () => {
     console.log(`Pronto! Login realizado como ${client.user.tag}\n`);
@@ -37,6 +53,12 @@ client.once('ready', () => {
 
     console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
     console.log('\n');
+
+    //status personalizado
+    setInterval(() => {
+        let random = Math.floor(Math.random() * status.length);
+        client.user.setActivity(status[random]);
+    }, 10000);
 });
 
 //avisa se alguém adicionar o bot
