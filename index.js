@@ -28,17 +28,60 @@ for (const file of commandFiles){
 
 let status = [
     {
-        name: "🎮",
-    },
-    {
-        name: "Vote no top.gg",
+        name: "🗳️ Vote no top.gg",
         type: ActivityType.Watching,
         link: "https://top.gg/bot/1193011045577523300"
     },
     {
-        name: "Slow Beats",
+        name: "👨‍💻 Explorando novas linguagens",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "📘 Compartilhando dicas de código",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🔍 Resolvendo bugs",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "💬 Respondendo dúvidas de programação",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🚀 Lançando atualizações",
+        type: ActivityType.Watching,
+        link: "https://github.com/emanuelsacoman/CodeBucket-website"
+    },
+    {
+        name: "🎵 Encontrando inspiração em músicas",
         type: ActivityType.Listening,
         link: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=0948ff034a394fba"
+    },
+    {
+        name: "📚 Aprendendo novos frameworks",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "💻 Codificando novas funcionalidades",
+        type: ActivityType.Watching,
+        link: "https://github.com/emanuelsacoman/CodeBucket-website"
+    },
+    {
+        name: "🔧 Otimizando desempenho",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🌐 Desenvolvendo para a web",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "📝 Escrevendo documentação",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🔍 Depurando código",
+        type: ActivityType.Playing
     },
 ]
 
@@ -58,7 +101,7 @@ client.once('ready', () => {
     setInterval(() => {
         let random = Math.floor(Math.random() * status.length);
         client.user.setActivity(status[random]);
-    }, 10000);
+    }, 100000);
 });
 
 //avisa se alguém adicionar o bot
