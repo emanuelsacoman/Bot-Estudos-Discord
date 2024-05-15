@@ -88,6 +88,10 @@ let status = [
         name: "🔍 Depurando código",
         type: ActivityType.Playing
     },
+    {
+        name: "🛢️ Enchendo o balde de códigos",
+        type: ActivityType.Playing,
+    },
 ]
 
 // Login do bot
