@@ -68,6 +68,11 @@ let status = [
         link: "https://github.com/emanuelsacoman/CodeBucket-website"
     },
     {
+        name: "🔍 Descobrindo novos comandos",
+        type: ActivityType.Watching,
+        link: "https://codebucketweb.web.app/comandos"
+    },
+    {
         name: "🔧 Otimizando desempenho",
         type: ActivityType.Playing,
     },
