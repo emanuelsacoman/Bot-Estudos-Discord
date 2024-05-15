@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder  } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { DateTime } = require("luxon");
 
 let timers = {};
 
@@ -44,10 +45,10 @@ module.exports = {
             }
     
             const [hours, minutes] = timeString.split(":");
-            const now = new Date();
-            const targetTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+            const now = DateTime.utc(); // Obtém a data e hora atual em UTC
+            const targetTime = DateTime.utc(now.year, now.month, now.day, hours, minutes);
     
-            const timeDifference = targetTime.getTime() - now.getTime();
+            const timeDifference = targetTime.diff(now, 'milliseconds').milliseconds;
             if (timeDifference <= 0) {
                 await interaction.reply({content: "O horário especificado já passou.", ephemeral: true});
                 return;
