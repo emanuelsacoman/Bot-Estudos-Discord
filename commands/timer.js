@@ -55,7 +55,10 @@ module.exports = {
 
                 // Define o novo temporizador
                 timers[interaction.user.id] = setTimeout(() => {
-                    interaction.editReply({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
+                    interaction.editReply({ content: `Finalizado.`}).then(() => {
+                        // Notificar o usuário novamente após a edição
+                        interaction.followUp({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
+                    });
                 }, tempoEmMilissegundos);
 
                 await interaction.reply({ content: `<@${interaction.user.id}>`, embeds: [embed1] });
@@ -72,7 +75,7 @@ module.exports = {
                             .setTimestamp();
                     await interaction.reply({ embeds: [exampleEmbed] });
                 } else {
-                    await interaction.reply("Não há temporizador em execução para você.");
+                    await interaction.reply({ content: "Não há temporizador em execução para você.", ephemeral: true});
                 }
             }
         } catch (error) {
