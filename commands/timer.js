@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
-// Objeto para armazenar os temporizadores ativos
 let timers = {};
 
 module.exports = {
@@ -55,16 +54,13 @@ module.exports = {
 
                 // Define o novo temporizador
                 timers[interaction.user.id] = setTimeout(() => {
-                    interaction.editReply({ content: `<@${interaction.user.id}>`, embeds: [embed2] }).then(() => {
-                        // Obter o canal onde a interação ocorreu e enviar a mensagem
-                        const channel = interaction.channel;
-                        channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
-                    });
+                    const channel = interaction.channel;
+                    channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
                 }, tempoEmMilissegundos);
+
 
                 await interaction.reply({ content: `<@${interaction.user.id}>`, embeds: [embed1] });
             } else if (subcommand === "stop") {
-                // Se houver um temporizador definido para o usuário, cancelá-lo
                 if (timers[interaction.user.id]) {
                     clearTimeout(timers[interaction.user.id]);
                     delete timers[interaction.user.id];
