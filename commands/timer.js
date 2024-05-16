@@ -55,9 +55,10 @@ module.exports = {
 
                 // Define o novo temporizador
                 timers[interaction.user.id] = setTimeout(() => {
-                    interaction.editReply({ content: `Finalizado.`}).then(() => {
-                        // Notificar o usuário novamente após a edição
-                        interaction.followUp({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
+                    interaction.editReply({ content: `<@${interaction.user.id}>`, embeds: [embed2] }).then(() => {
+                        // Obter o canal onde a interação ocorreu e enviar a mensagem
+                        const channel = interaction.channel;
+                        channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
                     });
                 }, tempoEmMilissegundos);
 
