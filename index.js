@@ -115,7 +115,13 @@ client.once('ready', () => {
 
 //avisa se alguém adicionar o bot
 client.on('guildCreate', guild => {
-    console.log(`O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id}).`);
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    console.log(`O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id})`);
+    console.log(`Data: ${formattedDate}`);
+    console.log(`Hora: ${formattedTime}`);
     console.log(`O bot está conectado em um total de ${client.guilds.cache.size} servidores.`);
     console.log('\n');
 });
