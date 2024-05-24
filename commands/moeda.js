@@ -38,7 +38,7 @@ module.exports = {
             const valorConvertido = (valor * taxaDeCambio).toFixed(2);
             
             const embed = new EmbedBuilder()
-                .setColor('#00FF00')
+                .setColor('#ff9c00')
                 .setTitle('Conversão de Moeda')
                 .setDescription(`Conversão de ${valor} ${origem} para ${destino}`)
                 .addFields(
