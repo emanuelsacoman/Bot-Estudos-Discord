@@ -46,7 +46,7 @@ module.exports = {
                     { name: 'Valor Convertido', value: `${valorConvertido} ${destino}`, inline: true },
                     { name: 'Taxa de Câmbio', value: `1 ${origem} = ${taxaDeCambio} ${destino}`, inline: false }
                 )
-                .setFooter({ text: 'Conversor de Moedas', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
+                .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
