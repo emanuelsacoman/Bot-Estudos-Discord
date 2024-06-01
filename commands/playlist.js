@@ -19,7 +19,7 @@ module.exports = {
         });
 
         const emojis = ['🎵', '📚', '🎧', '🎶', '📖', '🎓', '📝', '🔬', '📌', '💡', '🖊️', '✏️', '📏', '🖇️', '💙'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)]; // Selecionar um emoji aleatório
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
 
         const followUpMessage = await interaction.followUp({ content: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=3fb6ffe4339d462e" });
 

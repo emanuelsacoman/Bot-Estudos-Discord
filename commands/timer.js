@@ -46,13 +46,11 @@ module.exports = {
                     .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                     .setTimestamp();
 
-                // Se houver um temporizador anteriormente definido para o mesmo usuário, cancelá-lo
                 if (timers[interaction.user.id]) {
                     clearTimeout(timers[interaction.user.id]);
                     delete timers[interaction.user.id];
                 }
 
-                // Define o novo temporizador
                 timers[interaction.user.id] = setTimeout(() => {
                     const channel = interaction.channel;
                     channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });

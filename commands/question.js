@@ -11,28 +11,23 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        // Obtém a pergunta do usuário a partir da interação
         const userQuestion = interaction.options.getString("pergunta");
 
-        // Verifica se o usuário forneceu uma pergunta
         if (!userQuestion) {
             return interaction.reply({ content: "Por favor, forneça uma pergunta relacionada à programação.", ephemeral: true });
         }
 
         try {
-            // Faz uma chamada para a API do Stack Exchange para obter perguntas relacionadas
             const response = await axios.get(
                 `https://api.stackexchange.com/2.3/search?order=desc&sort=activity&intitle=${encodeURIComponent(
                     userQuestion
                 )}&site=stackoverflow`
             );
 
-            // Verifica se há resultados da API
             if (response.data.items.length > 0) {
                 const topResult = response.data.items[0];
                 const answerLink = topResult.is_answered ? `\nResposta: \`${topResult.link}\`` : "";
 
-                // Responde ao usuário no Discord
                 const exampleEmbed = new EmbedBuilder()
                     .setColor('#ff9c00')
                     .setAuthor({ name: `Stack Overflow`, iconURL: `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`, url: `${topResult.link}` })

@@ -21,10 +21,8 @@ module.exports = {
         try {
             const response = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${idioma}&dt=t&q=${encodeURIComponent(texto)}`);
             
-            // A resposta é um array de arrays, onde o primeiro elemento contém a tradução.
             const traducao = response.data[0][0][0];
 
-            // Adiciona um emoji de mapa antes do texto traduzido
             const textoTraduzido = `🗺️ | <@${interaction.user.id}>\n${traducao}`;
 
             await interaction.reply(`${textoTraduzido}`);

@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
-// Mapa para armazenar listas de tarefas por usuário
 const userToDoLists = new Map();
 
 module.exports = {
@@ -38,11 +37,10 @@ module.exports = {
             const subcommand = interaction.options.getSubcommand();
     
             if (!userToDoLists.has(userId)) {
-                // Se o usuário não tem uma lista, cria uma nova lista vazia para o usuário
                 userToDoLists.set(userId, []);
             }
     
-            const toDoList = userToDoLists.get(userId); // Obtém a lista de tarefas do usuário
+            const toDoList = userToDoLists.get(userId);
     
             if (subcommand === 'add') {
                 const task = interaction.options.getString('tarefa');

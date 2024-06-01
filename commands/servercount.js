@@ -6,7 +6,6 @@ module.exports = {
         .setDescription("Em quantos servidores CodeBucket está?"),
 
     async execute(interaction){
-        // Pode-se obter a contagem de servidores do bot através do client/bot
         const serverCount = interaction.client.guilds.cache.size;
 
         const exampleEmbed = new EmbedBuilder()
