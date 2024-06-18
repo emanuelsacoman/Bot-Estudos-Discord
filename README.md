@@ -2,6 +2,8 @@
 
 Um bot desenvolvido com uso de JavaScript feito com o objetivo de auxíliar pessoas que querem estudar programação utilizando a plataforma Discord!
 
+> [Repositório do site!](https://github.com/emanuelsacoman/CodeBucket-website)
+
 ## Hospedagem 🟢​
 
 O bot foi hospedado usando o plano gratuíto de Gratian, atualmente minha indicação para quem deseja hospedar o próprio bot de graça.
