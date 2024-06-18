@@ -27,7 +27,6 @@ module.exports = {
 
         await interaction.reply({ embeds: [qrCodeEmbed], files: [qrCodeFileName] });
 
-        // Remover o arquivo após a resposta ter sido enviada
         fs.unlinkSync(qrCodeFileName);
     },
 };

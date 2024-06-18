@@ -14,7 +14,7 @@ O bot foi hospedado usando o plano gratuíto de Gratian, atualmente minha indica
 
 Atualmente o bot está presente na top.gg, o que significa que o bot tem relevância. Com isso, fique a vontade para **votar**, dar um feedback e, dessa forma, me auxíliar.
 
-![alt text](topgg.png)
+![alt text](images/topgg.png)
 
 [![Discord Bots](https://top.gg/api/widget/upvotes/1193011045577523300.svg)](https://top.gg/bot/1193011045577523300)
 
