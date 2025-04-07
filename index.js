@@ -92,7 +92,55 @@ let status = [
         name: "🛢️ Enchendo o balde de códigos",
         type: ActivityType.Playing,
     },
-]
+    {
+        name: "🚀 Explodindo com novas features",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "👥 Interagindo com a comunidade",
+        type: ActivityType.Watching,
+    },
+    {
+        name: "📊 Monitorando métricas",
+        type: ActivityType.Watching,
+    },
+    {
+        name: "🖥️ Testando atualizações",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🔮 Explorando possibilidades de IA",
+        type: ActivityType.Watching,
+    },
+    {
+        name: "🏗️ Construindo integrações",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🎨 Criando designs inovadores",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "🔐 Aprimorando a segurança",
+        type: ActivityType.Watching,
+    },
+    {
+        name: "📈 Analisando tendências de código",
+        type: ActivityType.Watching,
+    },
+    {
+        name: "🤖 Automatizando processos",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "⚙️ Configurando novas ferramentas",
+        type: ActivityType.Playing,
+    },
+    {
+        name: "💡 Inspirando com novas ideias",
+        type: ActivityType.Playing,
+    },
+];
 
 // Login do bot
 client.once('ready', () => {
