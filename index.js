@@ -2,7 +2,6 @@ const { Client, Events, GatewayIntentBits, Collection, Activity, ActivityType } 
 
 const cooldowns = new Collection();
 
-// dotenv
 const dotenv = require('dotenv')
 dotenv.config()
 const { TOKEN } = process.env
