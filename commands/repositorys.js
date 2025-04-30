@@ -18,7 +18,7 @@ module.exports = {
             const data = response.data;
 
             if (data && data.items && data.items.length > 0) {
-                const topRepos = data.items.slice(0, 5); // Pegar os top 5 repositórios
+                const topRepos = data.items.slice(0, 5); 
                 const repoList = topRepos.map(repo => `• [${repo.full_name}](${repo.html_url}) - ${repo.stargazers_count} estrelas`);
                 const message = `Aqui estão os top 5 repositórios de ${linguagem} no GitHub:\n${repoList.join("\n")}`;
 
