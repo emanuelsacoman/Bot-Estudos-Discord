@@ -1,12 +1,12 @@
 # Índice de decisões arquiteturais
 
-Inicializado em 2026-11-07. **Nenhum ADR histórico foi encontrado no repositório auditado; nenhum foi inventado nesta entrega.** A arquitetura observada está em [ARCHITECTURE](../ARCHITECTURE.md); sugestões estão no [ROADMAP](../ROADMAP.md).
+Inicializado em 2026-11-07. Nenhum ADR histórico foi encontrado na auditoria inicial; a P1.3 estabelece a primeira decisão de execução abaixo, dentro do pedido autorizado. A arquitetura observada está em [ARCHITECTURE](../ARCHITECTURE.md); sugestões estão no [ROADMAP](../ROADMAP.md).
 
 O usuário estabeleceu nesta tarefa que o contexto persistente deve viver em `AGENTS.md` e `docs/brain/`, ser atualizado junto do código e respeitar a prioridade das fontes de verdade. Este índice registra essa orientação documental; ela não comprova decisões históricas sobre a arquitetura de execução do bot.
 
 | ADR | Título | Estado |
 | --- | --- | --- |
-| — | Ainda não há decisões de arquitetura de execução formalmente registradas | Nenhum ADR |
+| [0001](0001-isolamento-dos-timers.md) | Isolamento dos timers por contexto | Aceita na P1.3 |
 
 Quando uma decisão relevante for realmente estabelecida/aprovada, criar `NNNN-titulo-curto.md` e adicionar link a este índice. Registrar: título, data, estado (proposta/aceita/substituída), contexto e evidências, decisão, alternativas consideradas, consequências e referência à aprovação quando aplicável. Uma proposta nunca deve aparecer como aceita sem base.
 

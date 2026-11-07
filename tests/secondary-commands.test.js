@@ -375,6 +375,8 @@ test("/timer captura rejeição tardia do canal sem reusar a interação", async
     subcommand: "set",
     integers: { tempo: 1 },
   });
+  interaction.guildId = "servidor-timer-de-teste";
+  interaction.channelId = "canal-timer-de-teste";
   let sends = 0;
   interaction.channel = {
     async send() {

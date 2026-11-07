@@ -1,6 +1,6 @@
 # Operação e recuperação
 
-Atualizado na **P1.2, 2026-11-07**, base `develop` / `234f01b` (P1.1 já commitada). Instalações limpas normal/produção foram executadas em P0/P1.1; P1.2 validou interações e prazos HTTP offline com a instalação existente, sem alterar manifest/lock. Node 24.22.2/npm 11.19.1; alterações P1.2 sem commit. Login, registro, hospedagem e recuperação integral continuam apenas documentados, sem execução. Veja [QUALITY_GATES](QUALITY_GATES.md). Os exemplos usam PowerShell, a partir da raiz.
+Atualizado na **P1.3, 2026-11-07**, base `develop` / `a79f13a` (P1.2 já commitada). Instalações limpas normal/produção foram executadas em P0/P1.1; P1.2 validou interações/prazos HTTP e P1.3 acrescenta configuração/bootstrap, catálogo/registro e ciclo de timers. Node 24.22.2/npm 11.19.1; alterações P1.3 sem commit e sem novas dependências. Login e PUT reais, hospedagem e recuperação integral continuam `NOT_CONFIRMED`. Veja resultados e limites em [QUALITY_GATES](QUALITY_GATES.md). Os exemplos usam PowerShell, a partir da raiz.
 
 ## Preparar Node.js e dependências
 
@@ -51,11 +51,11 @@ Os testes usaram diretórios inicialmente sem `node_modules`/`.env`: `node_modul
 
 `npm ci` recria o `node_modules` do alvo: não aplique na instalação existente sem preparar o ambiente e preservar alterações locais pertinentes. Não remova/atualize o lock para contornar erros. [Comportamento oficial de npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci).
 
-Em P1.1, as duas variantes passaram novamente em `node_modules/.codebucket-p1/ci-development` e `ci-production`, com `--offline` e os caches P0 já preenchidos. `npm test` executa a suíte offline de SSRF, contratos, interações, HTTP e operações secundárias, sem precisar de `.env`; instruções para o runtime portátil em [qualidade](QUALITY_GATES.md). Distribua todo `lib/`: os comandos importam os helpers de resposta, prazo HTTP e SSRF durante o carregamento. P1.2 não adiciona dependências.
+Em P1.1, as duas variantes passaram novamente em `node_modules/.codebucket-p1/ci-development` e `ci-production`, com `--offline` e os caches P0 já preenchidos. `npm test` executa a suíte offline sem precisar de `.env`; P1.3 acrescenta casos de configuração, inicialização, registro e timers. Instruções/resultados em [qualidade](QUALITY_GATES.md). Distribua todo `lib/`: runtime, comandos e registro dependem dos módulos locais de configuração, catálogo, ciclo de vida, respostas, HTTP e timers. P1.2/P1.3 não adicionam dependências.
 
 ## Configurar ambiente e autenticação
 
-Os dois pontos de entrada chamam `dotenv.config()` sem caminho explícito: execute a partir da raiz, pois o `.env` é buscado no diretório de trabalho. Variáveis já injetadas no processo prevalecem sobre as do arquivo pelo comportamento padrão do dotenv instalado.
+O bootstrap de `index.js` e o modo **confirmado** de registro carregam `dotenv.config()` de forma lazy, sem caminho explícito: execute a partir da raiz, pois o `.env` é buscado no diretório de trabalho. Importar os pontos de entrada e usar `--dry-run` não carrega dotenv nem inicia login/PUT. Variáveis já injetadas no processo prevalecem sobre as do arquivo pelo comportamento padrão do dotenv instalado.
 
 Crie `.env` a partir do exemplo somente se ainda não existir:
 
@@ -69,12 +69,12 @@ Preencha os valores localmente em editor seguro ou injete-os pelo gerenciador de
 
 | Variável | Necessidade e origem | Comportamento existente |
 | --- | --- | --- |
-| `TOKEN` | Obrigatória para login e registro. Token do bot no Discord Developer Portal. | [index.js](../../index.js) passa a `client.login`; [deploy-commands.js](../../deploy-commands.js) autentica REST. Sem validação prévia. |
-| `CLIENT_ID` | Obrigatória somente para registrar comandos. Application ID da mesma aplicação do token. É identificador público. | Define a aplicação de `Routes.applicationCommands(CLIENT_ID)`; não é lida pelo runtime. |
+| `TOKEN` | Obrigatória para login e registro confirmado. Token do bot no Discord Developer Portal; dry-run não a exige. | [config.js](../../lib/config.js) normaliza prefixo `Bot`/`Bearer` e valida antes de Client/REST: valor opaco de 20–512 caracteres ASCII alfanuméricos ou `_ . -`, sem placeholders, espaços ou formas evidentemente inválidas. Não imprime nem valida a credencial online. |
+| `CLIENT_ID` | Obrigatória somente para registro confirmado. Application ID da mesma aplicação do token; identificador público. | String decimal de 17–20 dígitos, sem zero inicial e até o máximo de uint64. Define `Routes.applicationCommands(CLIENT_ID)`; o login do runtime não a exige. |
 | `INVITE_URL` | Opcional, URL OAuth pública completa da aplicação pretendida. | Ausente/vazia usa fallback com ID fixo `1193011045577523300`, `permissions=0` e scopes `bot applications.commands`; não deriva de CLIENT_ID. |
 | `LOFIRADIO_URL` | Opcional, URL pública válida HTTP(S). | Ausente/vazia usa `https://lofiradio.web.app`; apenas gera link/embed/botão. |
 
-Essas são **todas as quatro variáveis encontradas nas referências `process.env` da aplicação**, inclusive desestruturações; não há `GUILD_ID` nem chaves de APIs externas implementadas. `NODE_ENV` e outras configurações de ferramentas não são contratos de configuração da aplicação. O `.env` local continha as quatro chaves com valores não vazios, sem confirmar sua validade.
+Essas são **as quatro variáveis de configuração da aplicação**; não há `GUILD_ID` nem chaves de APIs externas implementadas. `NODE_ENV` e configurações de ferramentas não são contratos da aplicação. A presença de valores locais foi registrada na auditoria inicial, sem comprovar validade. A validação P1.3 é estrutural e conservadora: não decodifica token, não prova associação TOKEN/CLIENT_ID, permissões ou existência remota da aplicação.
 
 O Client solicita somente `GatewayIntentBits.Guilds`. Não há necessidade demonstrada pelo código de ativar intents privilegiadas para mensagens/membros. Confira a instalação OAuth da aplicação com scopes `bot` e `applications.commands`, acesso ao canal e permissões dos recursos usados: ver canal, enviar mensagens, embeds, anexar arquivos e adicionar reações; leitura do histórico pode ser necessária para reações. Não conceda Administrator como substituto dessa conferência. As permissões efetivas não foram consultadas.
 
@@ -82,15 +82,23 @@ O fallback `permissions=0` não garante esses recursos em todos os canais. A rec
 
 ## Registrar slash commands — ação remota separada
 
-O runtime **não registra comandos automaticamente**. O script [deploy-commands.js](../../deploy-commands.js) carrega todos os 23 módulos, serializa `data.toJSON()` e usa REST v10 com `PUT` em `Routes.applicationCommands(CLIENT_ID)`. Esse endpoint sobrescreve o conjunto **global** da aplicação, podendo remover comandos que não estejam no payload. [Contrato oficial do Discord](https://docs.discord.com/developers/interactions/application-commands#bulk-overwrite-global-application-commands).
+O runtime **não registra comandos automaticamente**. O script [deploy-commands.js](../../deploy-commands.js) usa [registration.js](../../lib/registration.js) e o mesmo [catálogo validado](../../lib/command-catalog.js) do runtime. O modo de envio usa REST v10 com `PUT` em `Routes.applicationCommands(CLIENT_ID)`; esse endpoint sobrescreve o conjunto **global** da aplicação, podendo remover comandos ausentes no payload. [Contrato oficial do Discord](https://docs.discord.com/developers/interactions/application-commands#bulk-overwrite-global-application-commands).
 
-Somente em tarefa com autorização explícita de registro, confira aplicação/token corretos, instalação das dependências completas, inventário pretendido e resultados offline; então:
+Para conferir somente os arquivos locais, sem `.env`, token, login ou instância REST:
 
 ```powershell
-node deploy-commands.js
+node deploy-commands.js --dry-run
 ```
 
-Esse script não oferece modo dry-run nem registro por servidor. Não use uma aplicação compartilhada como ambiente de teste. A mensagem de sucesso informa conclusão do pedido REST; não comprova disponibilidade imediata em todos os clientes. Falha é apenas logada no catch, sem código de saída confiável; imports/serialização anteriores ao try também podem lançar exceções. Não foi executado nesta tarefa.
+A CLI exige exatamente um argumento: `--dry-run` ou `--confirm-global-replacement`. Invocação sem argumento, desconhecido, duplicado ou combinação retorna código 1 antes de carregar ambiente ou enviar REST. O dry-run valida contratos, unicidade e snapshot do payload; falha de qualquer módulo bloqueia o catálogo inteiro. Não há seleção de comando individual ou registro por servidor.
+
+Somente em tarefa com autorização explícita de registro, confira aplicação/token corretos, instalação completa, inventário pretendido e resultados offline; o envio exige:
+
+```powershell
+node deploy-commands.js --confirm-global-replacement
+```
+
+Esse modo carrega ambiente e revalida configuração/payload antes de criar REST. Usa timeout e AbortSignal de 15 s, `retries: 0` e rejeição de rate limit, sem retry automático do PUT. A API de envio também exige confirmação explícita. Falhas de configuração, catálogo ou REST retornam mensagens fixas e código 1, sem objetos de erro/credenciais; a instância REST tem limpeza local. Sucesso retorna 0 e confirma somente o pedido REST, sem garantir propagação imediata nos clientes. Não houve PUT real nesta tarefa. A flag é uma proteção operacional, sem substituir a autorização do responsável.
 
 ## Iniciar e interromper
 
@@ -100,9 +108,11 @@ Depois de preparar/configurar uma instância cuja execução esteja autorizada:
 node index.js
 ```
 
-Não existe script `npm start` declarado; use a entrada explícita. Em `ready`, o código registra usuário, servidores e contagem no console; inicia rotação de presença a cada 100 segundos. Isso é comportamento esperado pelo fonte, não login comprovado na auditoria. Interrompa uma instância local interativa com `Ctrl+C`; serviços hospedados devem ser parados pelo supervisor aprovado para aquela instância.
+Não existe script `npm start` declarado; use a entrada explícita. O bootstrap carrega ambiente, valida TOKEN e catálogo e só então cria o Client; os handlers são instalados antes do login, cujo prazo é 30 s. Falha registra mensagem fixa, define `exitCode = 1` e tenta limpar recursos da aplicação e destruir o Client em até 2 s. Um watchdog de 5 s após a falha, com `unref`, força saída de erro se ainda houver recursos ativos. Esse fluxo foi projetado para inicialização, sem reiniciar o bot automaticamente.
 
-Não há desligamento gracioso, persistência ou recuperação de tarefas. Toda interrupção perde listas `/todo`, timers e cooldowns. O processo precisa permanecer ativo; não há servidor web para receber tráfego HTTP nem implementação de bot de voz.
+Em `ready`, o código mantém logs de usuário/servidores e rotação de presença a cada 100 s. Isso é comportamento esperado pelo fonte, sem login remoto comprovado. A limpeza de inicialização remove eventos operacionais, intervalo de presença e timeouts de cooldown; preserva somente um handler fixo de erro para falhas tardias durante a destruição do SDK. Interrompa uma instância local interativa com `Ctrl+C`; serviços hospedados devem ser parados pelo supervisor autorizado.
+
+Não há desligamento gracioso geral de SIGINT/SIGTERM, persistência ou recuperação de tarefas. `timers.clearAll()` existe no manager, sem ligação automática ao encerramento do processo. Toda interrupção perde listas `/todo`, timers e cooldowns. O processo precisa permanecer ativo; não há servidor web para receber tráfego HTTP nem implementação de bot de voz.
 
 ## Diagnóstico
 
@@ -110,7 +120,9 @@ Não há desligamento gracioso, persistência ou recuperação de tarefas. Toda 
 | --- | --- |
 | Node/npm sem versão ativa | Conferir versão da `.nvmrc`, localização do runtime e shim NVM. Usar binário portátil explícito fora do `node_modules` alvo ou preparar gerenciador em tarefa apropriada; não foi definido padrão global nesta fase. |
 | `Cannot find module 'prettier'` na inicialização/registro | Em commits anteriores à Fase 1, Prettier estava em devDependencies. Conferir manifest/lock atuais e instalação limpa; agora produção inclui Prettier, sem exigir `--include=dev`. Não copiar `node_modules` antigo como correção. |
-| Token inválido ou bot não chega a `ready` | Verificar segredo local, conexão de saída e aplicação; não imprimir token. `login` não tem catch explícito. |
+| Configuração recusada ou bot não chega a `ready` | Ler somente a mensagem fixa: TOKEN ausente/evidentemente inválido é recusado antes do Client; falha real de login tem prazo de 30 s, cleanup e saída 1. Conferir segredo/aplicação e conectividade em ambiente autorizado, sem imprimir token. |
+| Catálogo recusado ou comandos não carregam | Conferir instalação e contrato dos módulos e executar dry-run/testes offline. Catálogo vazio, duplicatas, falha de require/toJSON ou payload fora da política bloqueiam todo o carregamento antes de login/PUT. Não contornar removendo módulos sem revisar o conjunto global. |
+| Registro bloqueado sem enviar nada | Sem argumento ou argumento inválido retorna 1; dry-run não envia. O modo confirmado exige TOKEN/CLIENT_ID válidos estruturalmente e catálogo aprovado. Falha/timeout/rate limit não repete PUT automaticamente. |
 | Slash command ausente | Separar carregamento local de registro global/instalação OAuth. Confirmar aplicação e permissões; não rodar registro repetidamente como diagnóstico automático. |
 | “A aplicação não respondeu” / interação desconhecida | P1.2 reconhece antes das operações demoradas. Conferir atraso de entrega/event loop/rede: o defer também pode falhar. Interações expiradas não são reenviadas; o prazo inicial continua 3 s e o token reconhecido vale 15 min desde a criação. [Contrato de respostas](https://docs.discord.com/developers/interactions/receiving-and-responding). |
 | “InteractionAlreadyReplied” ou erro após sucesso aparente | P1.2 escolhe continuação por estado e não tenta novo envio após falha de entrega. Reações são secundárias e capturadas; erro inesperado após sucesso pode gerar follow-up conforme visibilidade já estabelecida. Não repetir manualmente uma operação sem conferir o efeito anterior. |
@@ -119,24 +131,26 @@ Não há desligamento gracioso, persistência ou recuperação de tarefas. Toda 
 | `/status` recusa um site público | P1.1 recusa DNS misto, faixas especiais, mapped/tradução IPv6, credenciais e redirects; usa somente o primeiro IP aprovado. Limites de 5 s/1 MiB/16 KiB também podem recusar sites online. Erros são genéricos e a saída omite caminho/query; não solicitar dumps com segredos como diagnóstico. |
 | Falha no QR code | cwd precisa permitir escrita; PNG temporário pode permanecer se envio falhar. Inspecionar arquivos sem apagá-los nesta auditoria. |
 | Anexos/reação não enviados | Conferir permissões e presença de `images/lofiradio.jpeg` e `images/lofiicon.png`. |
-| Lista/timer desapareceu ou mudou em outro servidor | Estado por userId é compartilhado entre servidores do mesmo processo e volátil. Não há backup restaurável dessas estruturas. |
+| Lista `/todo` apareceu em outro servidor | `/todo` continua por userId global no processo. Seu escopo/privacidade não foi alterado na P1.3; não há backup restaurável. |
+| Timer substituído, ausente ou aviso não chegou | Aceita 1–1440 minutos inteiros. Um timer por usuário+servidor; DM por usuário+canal. Outro `set` no mesmo servidor substitui e usa o novo canal; `stop` de outro escopo não cancela. Expiração remove estado antes do envio, que não tem retry. Conferir canal/permissões; envio já iniciado não é cancelado retroativamente. Reinício perde timers. |
+| Confirmação de início/cancelamento do timer falhou | O efeito local é mantido porque a resposta pode ter chegado ao Discord; não há rollback automático. Conferir o contexto antes de repetir, pois um novo set pode substituir o timer ativo. |
 
-P1.2 usa logs fixos para falhas de interação/secundárias e não imprime erros HTTP brutos. Logs de ready ainda incluem servidores e o registro remoto tem tratamento próprio; acesso/retenção continuam pendentes. Compartilhe somente trechos sanitizados. Veja [riscos](KNOWN_RISKS.md).
+P1.2 usa logs fixos para falhas de interação/secundárias e não imprime erros HTTP brutos. P1.3 usa mensagens sanitizadas também para configuração, inicialização, catálogo, registro e aviso do timer. Logs de ready ainda incluem servidores; acesso/retenção continuam pendentes. Compartilhe somente trechos sanitizados. Veja [riscos](KNOWN_RISKS.md).
 
 ## Preparação para futura hospedagem
 
 Não foi identificado provedor atual ou configuração de Docker, PM2, systemd, CI/CD ou serviço gerenciado. **Não há deploy aprovado ou realizado.** Como proposta técnica: um processo Node persistente com saída HTTPS/WebSocket para Discord/APIs, cwd na raiz, dependências completas, assets presentes, segredo injetado, espaço temporário gravável para QR codes e logs com retenção/acesso definidos.
 
-Runtime LTS, instalações limpas normal/produção e contratos offline foram validados em P0/P1.1; R06 foi corrigido localmente e P1.2 corrigiu R05/R07 nos testes controlados. Antes de publicar, permanecem os riscos de configuração/ciclo de vida, limites/estado e recuperação, além da validação operacional autorizada. Rede e roteamento da hospedagem são `NOT_CONFIRMED`. Supervisor e rollback são propostas; não estão implementados. Múltiplas réplicas/shards exigem decidir sincronização de estado/contagens; a versão atual é um único cliente/processo com memória local.
+Runtime LTS, instalações limpas normal/produção e contratos offline foram validados em P0/P1.1; R06 foi corrigido localmente e P1.2 corrigiu R05/R07 nos testes controlados. P1.3 trata R04/R08/R13 no escopo local de [QUALITY_GATES](QUALITY_GATES.md), sem certificar credenciais, login, permissões ou registro reais. Antes de publicar, permanecem encerramento geral, estado volátil, escopo de `/todo`, limites/arquivos e recuperação, além da validação operacional autorizada. Rede e roteamento da hospedagem são `NOT_CONFIRMED`. Supervisor e rollback são propostas. Múltiplas réplicas/shards exigem decidir sincronização de estado/contagens; a versão atual é um único cliente/processo com memória local.
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P1.1 já está commitada e as alterações P1.2 ainda estão sem commit.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P1.2 está commitada em `a79f13a` e as alterações P1.3 ainda estão sem commit.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.
 5. Configurar `.env` ou variáveis injetadas; conferir convite e URLs públicas. Não assumir que recriar a aplicação preserva identidade, instalações e votos.
-6. Executar os gates offline. O registro global já existente no Discord não depende de haver o processo antigo em execução: não registre novamente só porque mudou a máquina. Registrar somente se o conjunto remoto precisar mudar e houver autorização.
+6. Executar os gates offline e, se necessário, `node deploy-commands.js --dry-run` para conferir o catálogo sem credenciais/rede. O registro global já existente no Discord não depende do processo antigo: não registre novamente só porque mudou a máquina. Registrar somente se o conjunto remoto precisar mudar e houver autorização explícita para o modo confirmado.
 7. Em instância autorizada, iniciar `node index.js`, conferir `ready` e testar `/ping`, `/help`, menu `/docs`, anexos, reações e comandos HTTP num ambiente controlado. Registrar versão, commit, resultados e limitações; não declarar recuperação concluída só pelo log inicial.
 8. Listas/timers/cooldowns anteriores não são recuperáveis do Git: não há armazenamento persistente. Documentar a perda e atualizar [CURRENT](CURRENT.md).
 
