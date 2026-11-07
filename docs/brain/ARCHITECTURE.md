@@ -1,10 +1,10 @@
 # Arquitetura implementada
 
-Auditoria de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Este mapa descreve o código encontrado; conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
+Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização da Fase 1/P0 na mesma data, a partir de `develop` / `02e22dd`, onde o cérebro já estava versionado. A Fase 1 define Node 24 e corrige a classificação de Prettier; os fontes e contratos dos comandos permanecem iguais. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
 
 ## Componentes e responsabilidades
 
-É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Não há camadas de domínio, serviços ou repositórios separadas: cada comando concentra definição pública e execução. Não foram encontrados banco de dados, servidor HTTP próprio, fila, testes reais, configuração de CI ou infraestrutura de hospedagem versionada.
+É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Não há camadas de domínio, serviços ou repositórios separadas: cada comando concentra definição pública e execução. Não foram encontrados banco de dados, servidor HTTP próprio, fila, suíte de testes permanente, configuração de CI ou infraestrutura de hospedagem versionada. Os checks pontuais da Fase 1 estão registrados em qualidade.
 
 | Componente | Responsabilidade efetiva |
 |---|---|
@@ -13,6 +13,7 @@ Auditoria de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Este m
 | [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; comunicação externa e estado local ficam nos próprios módulos. |
 | [images/](../../images/) | Três imagens versionadas; `lofiradio.jpeg` e `lofiicon.png` são anexadas pelo comando Lofi. A presença de `topgg.png` não implica seu uso por `/vote`. |
 | [package.json](../../package.json), [package-lock.json](../../package-lock.json) | Faixas de dependências e resolução exata. Lockfile v3; entrada principal `index.js`; único script é um `test` placeholder que falha. |
+| [.nvmrc](../../.nvmrc) | Versão exata Node `24.22.2`; `engines.node` em `package.json` declara a linha `24.x`. A ativação local está descrita em operação. |
 | [.gitignore](../../.gitignore), [.env.example](../../.env.example) | `.env` e `node_modules` ignorados; exemplo público de configuração. Segredos são locais/externos ao Git. |
 | [AGENTS.md](../../AGENTS.md), [docs/](../README.md) | Protocolo permanente e memória documental. Descrevem o sistema; não implementam comportamento do bot. |
 
@@ -63,7 +64,7 @@ Há `try/catch` externo do listener, tratamento local de respostas do select/coo
 
 O registro não inicia o Client e o runtime não registra comandos remotamente. Configuração do aplicativo, scopes, permissões e correspondência de token/aplicação dependem do Discord; seu estado atual é `NOT_CONFIRMED`. O fallback de `/invite` aponta para um ID de aplicação fixo com scopes `bot applications.commands` e `permissions=0`, que não comprova permissões efetivas nos canais.
 
-**Não executar o registro como teste local.** A tarefa documental não autoriza alterações na API do Discord.
+**Não executar o registro como teste local.** A preparação local de ambiente da Fase 1 não autoriza alterações na API do Discord.
 
 ## Dependências e integrações
 
@@ -74,9 +75,11 @@ O registro não inicia o Client e o runtime não registra comandos remotamente. 
 | dotenv | 16.4.7 | Configuração em `index.js` e `deploy-commands.js`. |
 | qrcode | 1.5.4 | Geração de PNG local. |
 | node-fetch | 3.3.2 | Declarado, mas sem importação encontrada; `/github` usa `fetch` global. |
-| prettier | 3.5.3 | Formatação de código durante execução; declarado como devDependency apesar de obrigatório no carregamento. |
+| prettier | 3.5.3 | Formatação de código durante execução; dependência de produção, obrigatória no carregamento. A Fase 1 moveu a mesma faixa `^3.5.3` de devDependencies para dependencies. |
 
-`/translate` importa `@discordjs/builders` diretamente, embora ele seja apenas dependência transitiva do discord.js. O projeto não declara `engines` ou versão de Node. Os requisitos do lock chegam a Node `>=18.17` por `undici 6.21.1`; esse mínimo de pacote não é uma recomendação de suporte operacional atual. Ambiente e política de versão estão em [OPERATIONS.md](OPERATIONS.md).
+`/translate` importa `@discordjs/builders` diretamente, embora ele seja apenas dependência transitiva do discord.js. O projeto declara `engines.node: "24.x"` e fixa `24.22.2` em `.nvmrc`. Os requisitos antigos do lock chegam a Node `>=18.17` por `undici 6.21.1`; esse mínimo de pacote não substitui a política atual Node 24. A distribuição oficial Node `24.22.2` inclui npm `11.19.1`. Ambiente, fontes da versão e ativação estão em [OPERATIONS.md](OPERATIONS.md).
+
+Na auditoria inicial, Prettier era devDependency, embora importado por `/formatar` durante a inicialização. A classificação foi corrigida na Fase 1 ([R02](KNOWN_RISKS.md#r02)) sem upgrade de faixa ou versão resolvida. Com Node `24.22.2` e npm `11.19.1`, instalações limpas separadas com `npm ci` e `npm ci --omit=dev`, ambas com `--engine-strict`, passaram: 85 pacotes com versões iguais ao lock, 25 fontes com sintaxe válida e 23 comandos importados/serializados com nomes únicos em cada modo. O payload JSON permaneceu idêntico ao baseline anterior à mudança; os cinco parsers de `/formatar` passaram com resposta simulada. Isso resolve o carregamento em produção de R02, sem comprovar login ou operação no Discord. Métodos, isolamento e resultados estão em [QUALITY_GATES.md](QUALITY_GATES.md).
 
 | Fronteira externa | Comandos / uso | Autenticação observada |
 |---|---|---|

@@ -1,6 +1,6 @@
 # CodeBucket — instruções permanentes
 
-CodeBucket é um bot acadêmico de estudos de programação no Discord. Usa JavaScript CommonJS, Node.js, discord.js 14, dotenv, axios, qrcode e Prettier. A arquitetura real é um processo com módulos em `commands/`; consulte [a arquitetura](docs/brain/ARCHITECTURE.md).
+CodeBucket é um bot acadêmico de estudos de programação no Discord. Usa JavaScript CommonJS, Node.js 24, discord.js 14, dotenv, axios, qrcode e Prettier. A referência exata do runtime está em [.nvmrc](.nvmrc); `engines.node` limita a linha validada a `24.x`. A arquitetura real é um processo com módulos em `commands/`; consulte [a arquitetura](docs/brain/ARCHITECTURE.md).
 
 ## Antes de qualquer tarefa
 
@@ -12,6 +12,7 @@ CodeBucket é um bot acadêmico de estudos de programação no Discord. Usa Java
 
 - Prioridade: código/configuração efetivos → testes reproduzíveis → contratos/interfaces → documentação verificada → decisões registradas → inferências/propostas. Corrija a compreensão documental antes de mudar código para atender documentação antiga.
 - Preserve os contratos `data`/`execute(interaction)` e os nomes públicos dos comandos. Runtime e registro global carregam todos os módulos; uma dependência ausente pode afetar o bot inteiro.
+- Dependências importadas por comandos precisam estar disponíveis em produção; Prettier é dependência de execução. Valide mudanças no manifest/lock com instalação limpa normal e `npm ci --omit=dev`, sem executar os pontos de entrada.
 - Faça mudanças pequenas e reversíveis, preserve comportamentos e evite duplicar responsabilidades. Justifique novas dependências. Não implemente recursos fora do pedido nem use dados fictícios em produção.
 - Use `NOT_CONFIRMED` para fatos não verificados e `KNOWN_RISK` para riscos com evidência. Código implementado não equivale a operação remota validada.
 - Siga [QUALITY_GATES.md](docs/brain/QUALITY_GATES.md); registre comandos, ambiente, resultados e limitações. Nunca marque uma verificação como aprovada sem executá-la.
@@ -20,7 +21,7 @@ CodeBucket é um bot acadêmico de estudos de programação no Discord. Usa Java
 
 - Nunca revele, registre ou versione tokens, chaves, valores do `.env` ou dados sensíveis. `.env.example` contém somente placeholders seguros/valores públicos; mantenha `.env` e `node_modules` ignorados.
 - Não faça deploy, registro/remoção de comandos Discord, alterações remotas, reinícios de produção, mudanças de credenciais, exclusões, commits ou push sem autorização explícita para a ação. `deploy-commands.js` substitui o conjunto global de comandos e não é teste local.
-- A inicialização documental de 2026-11-07 autoriza somente inspeção, documentação, `.env.example` e verificações locais não destrutivas. O [roadmap](docs/brain/ROADMAP.md) contém propostas e não autoriza implementação.
+- A inicialização documental está commitada na `develop`. A Fase 1 autoriza a recuperação local do ambiente, configuração de versão, correção da classificação do Prettier, instalações isoladas e verificações offline; não autoriza executar `index.js` ou `deploy-commands.js`. Cada nova tarefa segue o escopo do pedido vigente. O [roadmap](docs/brain/ROADMAP.md) não autoriza automaticamente outros incrementos.
 
 ## Ao concluir
 

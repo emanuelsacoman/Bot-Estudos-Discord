@@ -1,6 +1,8 @@
 # Cérebro do CodeBucket
 
-Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`.
+Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. O cérebro foi commitado na `develop` em `02e22dd408a12b857127ebb1a689a857b6dd8a58` (`Brain`); a referência local `origin/develop` aponta para esse mesmo commit.
+
+**Fase 1 / P0:** Node 24.22.2 definido em [.nvmrc](../.nvmrc), Prettier corrigido como dependência de produção e instalações limpas normal/produção validadas offline. Login, registro e deploy continuam fora da validação. As alterações desta fase ainda não foram commitadas por este agente.
 
 | Documento | Quando consultar |
 | --- | --- |

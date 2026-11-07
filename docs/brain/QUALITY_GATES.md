@@ -2,9 +2,33 @@
 
 Use verificações proporcionais à alteração. Uma mudança documental pede revisão de conteúdo, links, diff e segredos; uma mudança em carregamento/contratos pede também sintaxe e serialização de todos os comandos. Uma mudança em API, interação ou estado pede casos de sucesso e falha relevantes. Não use registro global ou login de produção como teste local.
 
+## Resultado da Fase 1 / P0 — 2026-11-07
+
+Base `develop` / `02e22dd408a12b857127ebb1a689a857b6dd8a58`; árvore inicialmente limpa. O cérebro já estava commitado e a referência local `origin/develop` coincidia com a branch. As alterações P0 ainda não foram commitadas por este agente.
+
+| Verificação executada | Resultado e limite |
+| --- | --- |
+| Runtime e procedência | `PASS`: ZIP oficial Windows x64 Node **24.22.2**, SHA-256 igual ao `SHASUMS256.txt` da mesma distribuição, Node `--version` e npm CLI `--version` confirmam **24.22.2 / 11.19.1**. `.nvmrc` exata e `engines.node: 24.x` coerentes. |
+| Instalação limpa normal | `PASS`: `NODE_ENV=development`, `npm ci --engine-strict` com opções de isolamento descritas em [OPERATIONS](OPERATIONS.md), exit **0**, **85 pacotes**. |
+| Instalação limpa de produção | `PASS`: `NODE_ENV=production`, `npm ci --omit=dev --engine-strict`, mesmas opções, exit **0**, **85 pacotes**, incluindo Prettier 3.5.3. |
+| Isolamento | `PASS`: duas cópias inicialmente sem node_modules e sem `.env`, caches npm distintos inicialmente vazios e userconfig/globalconfig vazios. A resolução dos módulos foi interceptada e recusava caminhos fora da cópia; 687 arquivos de dependências resolvidos localmente em cada instalação. Nenhum fallback para o node_modules antigo. |
+| Sintaxe em ambos os modos | `PASS`: **25/25** arquivos JS por instalação, `node --check` recebendo fonte via stdin. Os pontos de entrada foram apenas analisados, nunca executados. |
+| Comandos em ambos os modos | `PASS`: **23/23** módulos com `execute` função, `data.toJSON()` executado e nomes únicos; nenhum nome duplicado. |
+| Contratos públicos preservados | `PASS`: JSON dos 23 comandos comparado com baseline anterior à mudança. Ambos os modos produziram SHA-256 `e50cb9e0df937132bf0381b136a80cab6e46bdd0186f69490a825961b9d53f15`; fonte dos comandos inalterado. |
+| Prettier de produção | `PASS`: execução real de `/formatar` com interação/reply simulados para **babel, html, css, json e markdown**, em ambos os modos; um reply, embed serializável e conteúdo formatado esperado por caso. Sem Discord/API. |
+| Manifest, lock e engines | `PASS`: dependências/engines da raiz iguais; 85/85 versões instaladas iguais ao lock por cópia. As **63** declarações de engine Node das dependências mais a do projeto (**64**) aceitam o runtime; requisitos npm presentes também aceitam 11.19.1. |
+| Ausência de atualização de pacotes | `PASS`: comparação das 85 entradas do lock contra `HEAD`: versões, resolved, integrity e demais metadados iguais, exceto remoção intencional de `prettier.dev`. Manifest/raiz do lock refletem somente a movimentação do Prettier e engines. |
+| Rede durante checks offline | `PASS`: `http`/`https` e `fetch` guardados pelo verificador, **0 tentativas**; somente downloads oficiais Node/registry npm foram necessários na preparação/instalação. Não houve login, PUT Discord nem chamada das APIs dos comandos. |
+| Preservação e segurança | `PASS`: `.env` e fontes/assets preservados, `.env` ignorado/não rastreado; exemplo mantém os quatro nomes da aplicação e nenhum segredo foi acrescentado ao diff. Links internos e espaços revisados. |
+| Shim global NVM | `BLOCKED` somente para ativação pelo proxy: padrão `vnone`, só Node 20 instalado, auto-install desativado. Runtime portátil explícito funcional; não foram alterados NVM, PATH persistente ou Registro. Não há bloqueio restante para os testes P0 offline. |
+
+Os checks usaram `--preserve-symlinks --preserve-symlinks-main` no Node por causa da restrição de resolução de ancestrais documentada na auditoria inicial. Uma primeira comparação do verificador falhou porque confrontou objetos com propriedades `undefined` e baseline já salva em JSON; foi corrigida para comparar o **JSON serializado**, que é o contrato REST relevante. As execuções finais acima passaram; não houve correção de código do bot por esse falso alarme.
+
+As evidências locais auxiliares estão na área ignorada `node_modules/.codebucket-p0/`, incluindo baseline e resumos JSON por instalação; podem desaparecer ao recriar o node_modules original. O registro versionado dos resultados é esta tabela. Não foram adicionados framework, script permanente de auditoria ou CI. `npm test` continua o placeholder conhecido, sem alteração nesta fase.
+
 ## Resultado da inicialização — 2026-11-07
 
-Base `cea09b90889716b5b05139eaf06f8b0e858f179e`; runtime de auditoria Node v20.20.0 existente, por caminho explícito. Ele satisfaz os engines do lock, mas está EOL e não constitui recomendação de produção; [operações](OPERATIONS.md) propõe validar uma LTS suportada.
+Registro histórico da base `cea09b90889716b5b05139eaf06f8b0e858f179e`: a auditoria inicial usou Node v20.20.0 existente por caminho explícito, que satisfazia os engines então vigentes do lock. Essa versão está EOL e não é recomendação de produção. A validação posterior de Node 24 está na seção Fase 1 acima e em [operações](OPERATIONS.md); o engines atual do projeto é `24.x`.
 
 | Verificação executada | Resultado e limite |
 | --- | --- |
@@ -23,7 +47,7 @@ Os gates de documentação foram executados ao fechar esta entrega. O resultado 
 
 ## Reproduzir verificações offline
 
-Depois de corrigir o runtime local, os exemplos abaixo usam `node` pelo PATH. No sandbox auditado foi necessário substituir `node` pelo caminho do binário existente; as flags do segundo bloco contornam a resolução de ancestrais e não são requisito da arquitetura.
+Com Node da `.nvmrc` preparado, os exemplos abaixo usam `node` pelo PATH. No ambiente desta fase foi usado o binário portátil explícito, conforme [operações](OPERATIONS.md); as flags do segundo bloco contornam resolução de ancestrais e não são requisito da arquitetura. Para provar isolamento, repita os checks na instalação limpa, nunca substitua suas dependências pelas antigas.
 
 Análise sintática com entrada por stdin, sem login nem registro:
 
@@ -74,6 +98,6 @@ Revise antes qualquer módulo novo: importar JavaScript pode executar efeitos no
 
 ## Pendências explícitas
 
-`NOT_CONFIRMED`: instalação limpa com Node LTS proposto, `npm ci`, auditoria de vulnerabilidades, testes automatizados de handlers, testes de respostas/falhas HTTP, recuperação integral, login Discord, registro remoto e permissões reais. Nenhuma dessas verificações foi marcada como aprovada.
+`NOT_CONFIRMED`: auditoria de vulnerabilidades (`npm audit` desativado nas instalações), suíte permanente de handlers, testes de respostas/falhas HTTP, recuperação integral, login Discord, registro remoto e permissões reais. Essas verificações não foram marcadas como aprovadas. Instalações limpas normal/produção e os cinco casos locais de `/formatar` foram comprovados na Fase 1, sem equivaler a aprovação de operação remota.
 
 Quando uma mudança de comportamento for autorizada, proponha testes focados no risco alterado: erro após reply/defer, timer com limite/cancelamento/envio rejeitado, cleanup de QR após falha ou resposta de API inválida. Não é necessário criar CI complexo para manter esta base documental.

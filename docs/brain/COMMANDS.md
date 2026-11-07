@@ -1,6 +1,6 @@
 # Catálogo dos comandos
 
-Auditoria de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Foram encontrados **23 comandos** em [commands/](../../commands/). Os 23 módulos foram carregados localmente: `data.toJSON()`, função `execute` e nomes únicos foram verificados. Os comportamentos abaixo foram identificados no código; uso real no Discord e integrações externas permanecem `NOT_CONFIRMED`.
+Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Foram encontrados **23 comandos** em [commands/](../../commands/); na auditoria inicial, os 23 módulos foram carregados localmente e `data.toJSON()`, função `execute` e nomes únicos foram verificados. Atualização da Fase 1/P0 na mesma data, base `develop` / `02e22dd`: Node foi fixado em `24.22.2` e Prettier passou a dependência de produção; os fontes/contratos dos comandos não mudaram. Instalações limpas de desenvolvimento e produção com npm `11.19.1` passaram, assim como sintaxe, importação/serialização dos 23 módulos e igualdade do payload JSON com o baseline anterior à mudança; evidências em [QUALITY_GATES.md](QUALITY_GATES.md). Os comportamentos abaixo foram identificados no código; uso real no Discord e integrações externas permanecem `NOT_CONFIRMED`.
 
 ## Regras comuns
 
@@ -96,7 +96,9 @@ O embed usa a entrada em maiúsculas como título e o enunciado sorteado como de
 
 Executa `await prettier.format(codigo, { parser: linguagem })` e envia o resultado em campo de embed com bloco de código. Usa Prettier localmente, sem executar o código enviado e sem API externa.
 
-**Erros e limites:** Prettier está em `devDependencies`, mas é importado durante o carregamento de todos os comandos. Instalação que omite dependências de desenvolvimento pode impedir inicialização e registro. Não divide saídas grandes para os limites de campos/embeds do Discord. Catch envia erro efêmero sugerindo conferir a sintaxe, inclusive quando a causa é outra.
+**Dependência e histórico:** Prettier `3.5.3` é dependência de produção (`^3.5.3`), pois é importado durante o carregamento de todos os comandos. Na auditoria inicial estava em `devDependencies`; a Fase 1 corrigiu essa classificação ([R02](KNOWN_RISKS.md#r02)), preservando faixa e versão resolvida. Instalação limpa com `--omit=dev` e carregamento dos comandos passaram em Node `24.22.2`/npm `11.19.1`. O `execute` real de `/formatar` passou nos cinco parsers (`babel`, `html`, `css`, `json`, `markdown`) usando resposta simulada, em ambos os modos de instalação, sem chamadas de rede. Envio real no Discord continua `NOT_CONFIRMED`; consulte [QUALITY_GATES.md](QUALITY_GATES.md).
+
+**Erros e limites:** não divide saídas grandes para os limites de campos/embeds do Discord. Catch envia erro efêmero sugerindo conferir a sintaxe, inclusive quando a causa é outra. Comportamento do formatador não foi refatorado na Fase 1.
 
 ### `/git`
 

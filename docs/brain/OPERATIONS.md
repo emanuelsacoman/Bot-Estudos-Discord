@@ -1,27 +1,55 @@
 # Operação e recuperação
 
-Referência de 2026-11-07 para o commit `cea09b9`. Os procedimentos de instalação, login, registro e hospedagem abaixo são **documentados, não executados nesta auditoria**. Somente as verificações offline descritas em [QUALITY_GATES](QUALITY_GATES.md) foram realizadas. Os exemplos de shell usam PowerShell, a partir da raiz do repositório.
+Atualizado na Fase 1 de **2026-11-07**, base `develop` / `02e22dd` (cérebro já commitado). Instalações limpas normal e de produção e verificações offline foram **executadas** com Node 24.22.2/npm 11.19.1. Login, registro, hospedagem e recuperação integral continuam apenas documentados, sem execução. Veja os resultados em [QUALITY_GATES](QUALITY_GATES.md). Os exemplos usam PowerShell, a partir da raiz do repositório.
 
 ## Preparar Node.js e dependências
 
-O projeto não fixa runtime. O lock exige Node >=18.17 (discord.js 14.18.0 exige >=18; undici 6.21.1 exige >=18.17). Para uma recuperação futura, a proposta é usar **Node 24 LTS** e validar com o lock atual antes de promover. Na consulta de 2026-11-07, as linhas 22, 24 e 26 constam como LTS; 18 e 20 estão EOL. A recomendação oficial é produção em uma linha LTS suportada. [Ciclo oficial do Node.js](https://nodejs.org/en/about/previous-releases).
+O runtime de referência é **Node 24.22.2 LTS (Krypton)**, com **npm 11.19.1** da distribuição oficial. [.nvmrc](../../.nvmrc) fixa o patch reproduzível; `engines.node: "24.x"` no manifest/lock expressa a linha suportada pelo projeto, sem aceitar automaticamente novos majors. Isso é uma política do projeto: o mínimo legado do lock continua >=18.17, mas Node 18/20 estão EOL. Node 24 está em Maintenance LTS, com fim de suporte previsto para 2028-04-30. Fontes consultadas em 2026-11-07: [distribuições oficiais](https://nodejs.org/dist/index.json) e [calendário oficial](https://github.com/nodejs/Release/blob/main/schedule.json).
 
-Instale/selecione o Node pelo instalador oficial ou pelo gerenciador já usado no ambiente; confirme que o terminal resolve a versão pretendida. Nenhuma seleção/instalação foi realizada nesta tarefa.
+Em máquina nova, instale a versão da `.nvmrc` pelo instalador/ZIP oficial ou gerenciador adequado e confira as versões abaixo. `.nvmrc` é uma referência, não instala Node nem garante ativação em todos os gerenciadores. `engines` também não instala o runtime; use `--engine-strict` para detectar incompatibilidade na instalação.
 
 ```powershell
 node --version
 npm --version
 ```
 
-No ambiente auditado, os shims `node` e `npm` responderam “No active Node.js version is configured”. Um binário já instalado de Node 20.20.0 permitiu apenas testes locais por caminho explícito; não serve como aprovação de uma versão EOL para hospedagem. Erro `EPERM ... lstat` em ancestral ocorreu dentro do sandbox; flags `--preserve-symlinks --preserve-symlinks-main` permitiram a auditoria sem mudar permissões. Não confunda esse caso com defeito dos fontes.
+### Recuperação local sem alterar configuração global
 
-Em checkout novo, instale respeitando o lock e incluindo as dependências de desenvolvimento:
+O ambiente Windows possui NVM `2.0.1-hotfix.6`, em modo shim: o PATH aponta para proxies em `.nodejs`, que é uma junction para `.shim`. Só Node 20.20.0 estava instalado, com padrão `vnone`, `auto_use=true` e `auto_install=false`. Portanto não havia uma versão instalada/selecionada correspondente ao projeto. O `--local` de `nvm use` desse gerenciador seleciona versões locais e pode alterar o padrão; não significa ativação só na sessão. Nenhuma alteração de padrão, Registro ou PATH persistente foi feita.
+
+Na Fase 1 foi baixado o ZIP Windows x64 **Node 24.22.2** de `nodejs.org`, com SHA-256 conferido contra `SHASUMS256.txt` oficial, e extraído em `node_modules/.codebucket-p0/runtime/node-v24.22.2-win-x64`. Runtime, caches e cópias de teste são locais e ignorados pelo Git; não substituem uma instalação gerenciada em outra máquina. A área fica dentro do `node_modules` original, preservado nesta fase: **não execute `npm ci` na raiz usando esse binário**, pois o comando remove o diretório que o contém. Para instalar na raiz, use um runtime instalado fora do `node_modules` alvo.
+
+Para conferir o runtime portátil existente sem acionar o shim:
 
 ```powershell
-npm ci --include=dev
+$runtimeRoot = Join-Path (Get-Location).Path 'node_modules/.codebucket-p0/runtime/node-v24.22.2-win-x64'
+$nodeRuntime = Join-Path $runtimeRoot 'node.exe'
+$npmCli = Join-Path $runtimeRoot 'node_modules/npm/bin/npm-cli.js'
+& $nodeRuntime --version
+& $nodeRuntime --preserve-symlinks --preserve-symlinks-main $npmCli --version
 ```
 
-Esse comando é procedimento futuro: `npm ci` recria `node_modules` e deve ser executado em ambiente preparado para instalação. A inclusão explícita de dev é necessária porque [formatar.js](../../commands/formatar.js) importa Prettier ao carregar. Usar `--omit=dev` ou omissão por ambiente de produção pode impedir o bot inteiro de iniciar. Não remova/atualize o lock para contornar erros de instalação sem investigar. [Comportamento de npm ci](https://docs.npmjs.com/cli/v10/commands/npm-ci/).
+O sandbox encontrou `EPERM ... lstat` em ancestral na auditoria inicial. Foram mantidas as flags `--preserve-symlinks --preserve-symlinks-main` nos checks para contornar resolução de caminhos; não são requisito de hospedagem. Quando necessário para filhos do npm, PATH e `NODE_OPTIONS` foram definidos somente no processo PowerShell do teste. Não foram modificadas variáveis persistentes nem o NVM global.
+
+### Instalação reproduzível
+
+Com Node 24.22.2/npm 11.19.1 disponíveis **fora do diretório a ser recriado**, use checkout novo e preserve o lock:
+
+```powershell
+npm ci --engine-strict
+```
+
+Para instalação de produção, em **outra cópia limpa**:
+
+```powershell
+npm ci --omit=dev --engine-strict
+```
+
+As duas variantes foram executadas com sucesso na Fase 1, cada uma instalando 85 pacotes. Prettier `^3.5.3` agora está em `dependencies`, mantendo a versão travada `3.5.3`; a omissão de dev não remove mais o pacote requerido por [formatar.js](../../commands/formatar.js). Os outros pacotes não foram atualizados/removidos. `node-fetch` sem uso encontrado e importação transitiva de `@discordjs/builders` foram registrados para manutenção posterior, sem mudanças nesta fase.
+
+Os testes usaram diretórios inicialmente sem `node_modules`/`.env`: `node_modules/.codebucket-p0/ci-development` e `ci-production`, com cópias somente de fontes, assets, manifests, `.nvmrc` e `.env.example`. O npm recebeu `--prefix` apontando para cada cópia, caches distintos inicialmente vazios, userconfig/globalconfig vazios distintos, `--engine-strict --no-audit --no-fund --logs-max=0 --update-notifier=false` e registry público npm. Produção usou `NODE_ENV=production` e `--omit=dev`; desenvolvimento usou `NODE_ENV=development`. Nenhum pacote/credencial da instalação antiga foi usado para completar as cópias.
+
+`npm ci` recria o `node_modules` do alvo: não aplique na instalação existente sem preparar o ambiente e preservar alterações locais pertinentes. Não remova/atualize o lock para contornar erros. [Comportamento oficial de npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci).
 
 ## Configurar ambiente e autenticação
 
@@ -78,8 +106,8 @@ Não há desligamento gracioso, persistência ou recuperação de tarefas. Toda 
 
 | Sintoma | Conferência e limitação |
 | --- | --- |
-| Node/npm sem versão ativa | Selecionar uma LTS suportada no gerenciador usado pelo operador e reabrir o terminal; não foi corrigido globalmente nesta tarefa. |
-| `Cannot find module 'prettier'` na inicialização/registro | Instalação omitiu devDependencies; em ambiente preparado, reinstalar com `npm ci --include=dev`. Nenhuma dependência foi alterada nesta entrega. |
+| Node/npm sem versão ativa | Conferir versão da `.nvmrc`, localização do runtime e shim NVM. Usar binário portátil explícito fora do `node_modules` alvo ou preparar gerenciador em tarefa apropriada; não foi definido padrão global nesta fase. |
+| `Cannot find module 'prettier'` na inicialização/registro | Em commits anteriores à Fase 1, Prettier estava em devDependencies. Conferir manifest/lock atuais e instalação limpa; agora produção inclui Prettier, sem exigir `--include=dev`. Não copiar `node_modules` antigo como correção. |
 | Token inválido ou bot não chega a `ready` | Verificar segredo local, conexão de saída e aplicação; não imprimir token. `login` não tem catch explícito. |
 | Slash command ausente | Separar carregamento local de registro global/instalação OAuth. Confirmar aplicação e permissões; não rodar registro repetidamente como diagnóstico automático. |
 | “A aplicação não respondeu” / interação desconhecida | Há operações HTTP/arquivo antes do primeiro reply, sem defer. Discord exige resposta inicial em até 3 segundos; timeout de `/status` é 5 segundos. [Contrato de respostas](https://docs.discord.com/developers/interactions/receiving-and-responding). |
@@ -95,13 +123,13 @@ Logs de erros axios podem conter URLs e texto de consultas; compartilhe somente 
 
 Não foi identificado provedor atual ou configuração de Docker, PM2, systemd, CI/CD ou serviço gerenciado. **Não há deploy aprovado ou realizado.** Como proposta técnica: um processo Node persistente com saída HTTPS/WebSocket para Discord/APIs, cwd na raiz, dependências completas, assets presentes, segredo injetado, espaço temporário gravável para QR codes e logs com retenção/acesso definidos.
 
-Antes de publicar, validar runtime LTS/instalação limpa e tratar os riscos prioritários de `/status`, prazo das interações e erros assíncronos. Um supervisor com reinício controlado e procedimento de rollback são propostas; não estão implementados. Múltiplas réplicas/shards exigem decidir como sincronizar estado e contagens; a versão atual é um único cliente/processo com memória local.
+Runtime LTS, instalações limpas normal/produção e contratos offline foram validados na Fase 1. Antes de publicar, ainda é necessário tratar os riscos prioritários de `/status`, prazo das interações e erros assíncronos, além de validar operação em ambiente autorizado. Um supervisor com reinício controlado e procedimento de rollback são propostas; não estão implementados. Múltiplas réplicas/shards exigem decidir como sincronizar estado e contagens; a versão atual é um único cliente/processo com memória local.
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar o commit pretendido. Exemplo em máquina nova: `git clone https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase, e estas alterações P0 ainda não foram commitadas por este agente.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
-3. Preparar Node LTS suportado e npm; instalar com o lock via `npm ci --include=dev` em checkout novo. Conservar `commands/` e os três assets versionados.
+3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/` e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.
 5. Configurar `.env` ou variáveis injetadas; conferir convite e URLs públicas. Não assumir que recriar a aplicação preserva identidade, instalações e votos.
 6. Executar os gates offline. O registro global já existente no Discord não depende de haver o processo antigo em execução: não registre novamente só porque mudou a máquina. Registrar somente se o conjunto remoto precisar mudar e houver autorização.
