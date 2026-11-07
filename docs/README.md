@@ -1,8 +1,8 @@
 # Cérebro do CodeBucket
 
-Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. O cérebro foi commitado na `develop` em `02e22dd408a12b857127ebb1a689a857b6dd8a58` (`Brain`); a referência local `origin/develop` aponta para esse mesmo commit.
+Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. O cérebro foi commitado na `develop` em `02e22dd408a12b857127ebb1a689a857b6dd8a58` (`Brain`); a base desta tarefa é `develop` / `49138e6` (`Fase 1/P0`), com o P0 já commitado.
 
-**Fase 1 / P0:** Node 24.22.2 definido em [.nvmrc](../.nvmrc), Prettier corrigido como dependência de produção e instalações limpas normal/produção validadas offline. Login, registro e deploy continuam fora da validação. As alterações desta fase ainda não foram commitadas por este agente.
+**P0:** Node 24.22.2 definido em [.nvmrc](../.nvmrc), Prettier corrigido como dependência de produção e instalações limpas normal/produção validadas offline. **P1.1:** `/status` passa a validar URLs, IPs e DNS e conectar a um IP aprovado, sem seguir redirecionamentos; `npm test` executa a suíte offline de SSRF e regressão de contratos com `node:test`. Consulte os resultados e limites em [QUALITY_GATES](brain/QUALITY_GATES.md). As alterações P1.1 estão sem commit. Login, registro e deploy continuam fora da validação.
 
 | Documento | Quando consultar |
 | --- | --- |

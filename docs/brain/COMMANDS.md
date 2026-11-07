@@ -4,6 +4,8 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 ## Regras comuns
 
+**Atualização P1.1 — 2026-11-07, base `develop` / `49138e6`:** `/status` passou a usar transporte seguro do Node; contratos slash dos 23 comandos continuam idênticos ao P0. Suíte permanente de SSRF/interação simulada e carregamento passa offline; resultados e limites em [QUALITY_GATES](QUALITY_GATES.md).
+
 - Todos os módulos exportam `data` e `execute(interaction)`. O [runtime](../../index.js) carrega os arquivos `.js`; o [registro global](../../deploy-commands.js) serializa os mesmos módulos. Carregar ou serializar um módulo localmente não comprova registro remoto.
 - Todas as opções de entrada documentadas são **obrigatórias**. Somente `/formatar` define escolhas fechadas; os demais textos são livres. Não há `setMinValue`, `setMaxValue`, `setMinLength` ou `setMaxLength` nos builders atuais.
 - O runtime aplica cooldown de **5 segundos por comando e usuário**, comum a todos os servidores daquele processo. Nenhum módulo configura cooldown próprio. O timestamp é registrado antes de executar; uma execução que falha também consome o intervalo. Reiniciar perde os cooldowns. Menus não passam por esse controle.
@@ -208,9 +210,11 @@ Envia embed com `interaction.client.guilds.cache.size`. Não consulta armazename
 
 **Fonte:** [status.js](../../commands/status.js). **Opções:** `url` — string obrigatória.
 
-Adiciona `https://` quando a entrada não começa com `http://` ou `https://`. Faz axios GET com timeout de **5000 ms**. Sucesso gera embed verde com status HTTP; catch gera embed vermelho com status recebido ou “Desconhecido”.
+Adiciona `https://` a domínios sem esquema e preserva `url` obrigatória, nome, descrição e contrato `data`/`execute`. Faz GET usando [status-http.js](../../lib/status-http.js) e HTTP/HTTPS nativos do Node. Aceita somente HTTP(S), sem credenciais; canoniza IPs alternativos, bloqueia localhost e destinos privados, loopback, link-local, metadata e faixas especiais IPv4/IPv6. Valida todos os endereços retornados pelo DNS; qualquer resposta não pública recusa a consulta inteira. Conecta diretamente ao primeiro IP aprovado, sem nova resolução, preservando Host e domínio original para SNI/certificado TLS; não usa proxy/agente global nem segue redirecionamentos.
 
-**Erros e limites:** `KNOWN_RISK` de SSRF: destino é controlado pelo usuário sem bloqueio de redes privadas, loopback ou redirecionamentos para destinos internos. Faz GET real a partir da infraestrutura do bot. HTTP não 2xx pode ser apresentado como “Offline ou inacessível” mesmo com servidor acessível. Esperar até 5 segundos sem defer pode expirar a interação. Falha ao enviar o embed de erro propaga.
+Prazo de **5000 ms** cobre DNS, conexão, TLS e corpo; limites de **1 MiB** de corpo bruto, **16 KiB** de cabeçalhos e **2048 caracteres** de entrada. Corpo é descartado sem descompressão; respostas contêm somente origem (protocolo/domínio/porta) e status numérico, sem caminho, query, fragmento, cabeçalhos ou detalhes internos. HTTP 2xx gera embed verde “Online”; 3xx/4xx/5xx mantém embed vermelho “Offline ou inacessível” com o código recebido. Falhas de validação/DNS/conexão/timeout/limite geram mensagem genérica vermelha, sem repetir a entrada. Há somente uma tentativa local de reply.
+
+**Erros e limites:** R06 `RESOLVED` no escopo dos testes controlados, incluindo transporte nativo com sockets em memória e prova do IP conectado. A política conservadora recusa todo IPv4-mapped IPv6, tradução/transição e alguns blocos especiais globalmente roteáveis. Não há fallback entre IPs públicos nem redirects; sites online podem ser recusados por essas restrições ou pelos limites. Não há allowlist fixa de domínios. A semântica antiga para HTTP não 2xx foi preservada e não comprova indisponibilidade do servidor. Esperar até 5 s sem defer ainda pode expirar a interação (R07); uma falha de envio propaga ao handler global (R05). Consultas reais e operação no Discord permanecem `NOT_CONFIRMED`.
 
 ### `/timer`
 

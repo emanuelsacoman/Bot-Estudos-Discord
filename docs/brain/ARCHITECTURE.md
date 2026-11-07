@@ -1,18 +1,20 @@
 # Arquitetura implementada
 
-Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização da Fase 1/P0 na mesma data, a partir de `develop` / `02e22dd`, onde o cérebro já estava versionado. A Fase 1 define Node 24 e corrige a classificação de Prettier; os fontes e contratos dos comandos permanecem iguais. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
+Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização P1.1 na mesma data, a partir de `develop` / `49138e6` (`Fase 1/P0`), com o P0 já commitado. Node 24 e a classificação de Prettier vêm do P0; P1.1 altera a consulta de `/status` e adiciona testes permanentes, preservando os contratos públicos. As alterações P1.1 estão sem commit. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
 
 ## Componentes e responsabilidades
 
-É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Não há camadas de domínio, serviços ou repositórios separadas: cada comando concentra definição pública e execução. Não foram encontrados banco de dados, servidor HTTP próprio, fila, suíte de testes permanente, configuração de CI ou infraestrutura de hospedagem versionada. Os checks pontuais da Fase 1 estão registrados em qualidade.
+É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Cada comando concentra definição pública e execução; `/status` delega validação de destino e transporte a um helper local. Não há camadas de domínio ou repositórios separadas, banco de dados, servidor HTTP próprio, fila, configuração de CI ou infraestrutura de hospedagem versionada. P1.1 adiciona uma suíte com `node:test` focada em SSRF, respostas de `/status` e contratos dos 23 comandos; as evidências estão em qualidade.
 
 | Componente | Responsabilidade efetiva |
 |---|---|
 | [index.js](../../index.js) | Carrega configuração e módulos, instancia Client, conecta ao Gateway, trata eventos, cooldowns e select menu de documentação. |
 | [deploy-commands.js](../../deploy-commands.js) | Processo separado que importa os mesmos comandos e substitui sua definição global na API REST Discord v10. Não é chamado pelo runtime. |
-| [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; comunicação externa e estado local ficam nos próprios módulos. |
+| [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; `/status` usa o helper abaixo e os demais mantêm comunicação externa e estado local nos próprios módulos. |
+| [lib/status-http.js](../../lib/status-http.js) | Política de URLs/IPs, resolução DNS e GET de `/status` preso a um IP validado, com limites e erros sanitizados. Usa somente módulos nativos do Node. |
+| [tests/](../../tests/) | Testes offline com `node:test`, DNS e transporte simulados; regressão dos contratos dos comandos e respostas de `/status`. |
 | [images/](../../images/) | Três imagens versionadas; `lofiradio.jpeg` e `lofiicon.png` são anexadas pelo comando Lofi. A presença de `topgg.png` não implica seu uso por `/vote`. |
-| [package.json](../../package.json), [package-lock.json](../../package-lock.json) | Faixas de dependências e resolução exata. Lockfile v3; entrada principal `index.js`; único script é um `test` placeholder que falha. |
+| [package.json](../../package.json), [package-lock.json](../../package-lock.json) | Faixas de dependências e resolução exata. Lockfile v3; entrada principal `index.js`; script `test` executa `node --test`. P1.1 não adiciona dependências. |
 | [.nvmrc](../../.nvmrc) | Versão exata Node `24.22.2`; `engines.node` em `package.json` declara a linha `24.x`. A ativação local está descrita em operação. |
 | [.gitignore](../../.gitignore), [.env.example](../../.env.example) | `.env` e `node_modules` ignorados; exemplo público de configuração. Segredos são locais/externos ao Git. |
 | [AGENTS.md](../../AGENTS.md), [docs/](../README.md) | Protocolo permanente e memória documental. Descrevem o sistema; não implementam comportamento do bot. |
@@ -34,6 +36,8 @@ flowchart TD
     Slash --> Cooldown[Cooldown por usuário e comando]
     Cooldown --> Execute[execute interaction]
     Execute --> APIs[HTTP externo / respostas Discord]
+    Execute --> Status[lib/status-http.js: destino validado]
+    Status --> APIs
     Execute --> Memory[Map todo / objeto timers em memória]
     Execute --> Files[QR PNG temporário no cwd]
     Env --> Register[deploy-commands.js: execução separada]
@@ -71,7 +75,7 @@ O registro não inicia o Client e o runtime não registra comandos remotamente. 
 | Dependência | Versão resolvida no lock | Uso observado |
 |---|---|---|
 | discord.js | 14.18.0 | Gateway, builders, Collections, respostas e registro REST; API REST v10. |
-| axios | 1.8.4 | Consultas HTTP em seis comandos. |
+| axios | 1.8.4 | Consultas HTTP em cinco comandos; `/status` usa `node:http` e `node:https`. |
 | dotenv | 16.4.7 | Configuração em `index.js` e `deploy-commands.js`. |
 | qrcode | 1.5.4 | Geração de PNG local. |
 | node-fetch | 3.3.2 | Declarado, mas sem importação encontrada; `/github` usa `fetch` global. |
@@ -89,10 +93,20 @@ Na auditoria inicial, Prettier era devDependency, embora importado por `/formata
 | `translate.googleapis.com/translate_a/single` | `/translate`: tradução com `client=gtx`, origem automática | Sem chave explícita. |
 | `api.exchangerate-api.com/v4/latest` | `/moeda`: taxas e cálculo local | Sem chave explícita. |
 | `httpstat.us` | `/http`: código/descrição HTTP; 1xx é tratado localmente | Sem chave explícita. |
-| URL fornecida pelo usuário | `/status`: GET HTTP(S), timeout de cinco segundos | Sem restrição de destino implementada. |
+| URL fornecida pelo usuário | `/status`: GET HTTP(S) direto do Node, após política de destino e DNS; prazo total de 5000 ms, corpo até 1 MiB, cabeçalhos até 16 KiB, zero redirecionamentos | Sem autenticação; URLs com credenciais são rejeitadas. |
 | Spotify, top.gg, Lofi Radio, autor, documentação, imagens externas | Links, botões e imagens exibidos nas mensagens/presença | Não há integração OAuth/API própria nesses links. |
 
 As APIs HTTP são chamadas antes da primeira resposta, sem `deferReply`; somente `/status` define timeout HTTP explicitamente. Disponibilidade, rate limits, contratos atuais e destinos de links não foram verificados remotamente. As únicas variáveis de ambiente referenciadas no código são `TOKEN`, `CLIENT_ID`, `INVITE_URL` e `LOFIRADIO_URL`.
+
+### Fronteira HTTP de `/status` — P1.1
+
+O helper normaliza a URL com WHATWG, mantém HTTPS como padrão para entradas sem esquema e aceita apenas HTTP(S), sem credenciais. Rejeita nomes locais e endereços privados, loopback, link-local, metadata e faixas especiais/reservadas IPv4. Para IPv6, aceita conservadoramente unicast global `2000::/3`, com exclusões especiais; também rejeita IPv4-mapped, tradução e transição. Essa política pode recusar alguns endereços especiais roteáveis e não usa uma allowlist de domínios.
+
+Antes de conectar, `dns.lookup` obtém os endereços disponíveis com `all: true`; qualquer resultado não público invalida a consulta inteira. O transporte recebe o IP numérico aprovado como `hostname`, preservando Host e a identidade TLS do domínio original. Não há segunda resolução DNS, reutilização de conexão ou proxy do agente global (`agent: false`), e a validação de certificado permanece habilitada. `http.request`/`https.request` não seguem `Location`.
+
+Um prazo único de 5000 ms cobre DNS, conexão, TLS, cabeçalhos e corpo; uma resolução tardia não inicia nova requisição. O corpo é contado e descartado em streaming, sem armazenar, interpretar ou descomprimir conteúdo remoto. A interface mantém embeds verde/vermelho e os códigos HTTP; exibe somente a origem da URL, sem caminho ou query. Falhas usam uma mensagem fixa, sem erro bruto, corpo, cabeçalhos ou logs. O risco de prazo da interação Discord permanece em [R07](KNOWN_RISKS.md#r07), pois o comando continua sem `deferReply`.
+
+As faixas devem ser revistas quando os registros especiais [IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) e [IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/) da IANA mudarem. A semântica de agentes e proxies usada aqui está na [documentação HTTP do Node 24](https://nodejs.org/docs/latest-v24.x/api/http.html).
 
 ## Estado e acoplamentos
 

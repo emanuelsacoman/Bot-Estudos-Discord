@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const axios = require("axios");
+const { SlashCommandBuilder, EmbedBuilder, escapeMarkdown } = require("discord.js");
+const { checkStatus } = require("../lib/status-http");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,35 +12,25 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        let url = interaction.options.getString("url");
-
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = `https://${url}`;
-        }
-
+        const url = interaction.options.getString("url");
+        const embed = new EmbedBuilder()
+            .setTitle("Verificação de Status")
+            .setFooter({ text: "CodeBucket", iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png" })
+            .setTimestamp();
         try {
-            const response = await axios.get(url, { timeout: 5000 }); 
-
-            const embed = new EmbedBuilder()
-                .setColor("#00ff00")
-                .setTitle("Verificação de Status")
-                .setDescription(`O site **${url}** está **🟢 Online** (Status ${response.status}).`)
-                .setFooter({ text: "CodeBucket", iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png" })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed] });
-
-        } catch (error) {
-            let statusCode = error.response ? error.response.status : "Desconhecido";
-            
-            const embed = new EmbedBuilder()
-                .setColor("#ff0000")
-                .setTitle("Verificação de Status")
-                .setDescription(`O site **${url}** está **🔴 Offline** ou inacessível. (Erro ${statusCode})`)
-                .setFooter({ text: "CodeBucket", iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png" })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed] });
+            const { status, origin } = await checkStatus(url);
+            const site = escapeMarkdown(origin);
+            if (status >= 200 && status < 300) {
+                embed.setColor("#00ff00")
+                    .setDescription(`O site **${site}** está **🟢 Online** (Status ${status}).`);
+            } else {
+                embed.setColor("#ff0000")
+                    .setDescription(`O site **${site}** está **🔴 Offline** ou inacessível. (Erro ${status})`);
+            }
+        } catch {
+            embed.setColor("#ff0000")
+                .setDescription("Não foi possível verificar o site. Use uma URL HTTP(S) pública, sem credenciais; verifique o endereço ou tente novamente.");
         }
+        await interaction.reply({ embeds: [embed] });
     }
 };
