@@ -46,6 +46,10 @@ async function withStatusChecker(checkStatus, run) {
 
 function interactionFor(input, replies) {
   return {
+    createdTimestamp: Date.now(),
+    deferred: false,
+    replied: false,
+    ephemeral: false,
     options: {
       getString(name) {
         assert.equal(name, "url");
@@ -53,7 +57,18 @@ function interactionFor(input, replies) {
       },
     },
     async reply(payload) {
+      assert.equal(this.deferred || this.replied, false);
       replies.push(payload);
+      this.replied = true;
+    },
+    async deferReply() {
+      assert.equal(this.deferred || this.replied, false);
+      this.deferred = true;
+    },
+    async editReply(payload) {
+      assert.equal(this.deferred, true);
+      replies.push(payload);
+      this.replied = true;
     },
   };
 }
@@ -175,22 +190,19 @@ test("falhas de URL, DNS e conexão têm resposta genérica sem dados ou logs", 
   assert.deepEqual(logs, []);
 });
 
-test("falha do reply propaga sem tentar enviar uma segunda resposta", async (t) => {
+test("falha do editReply propaga sem tentar enviar uma segunda resposta", async (t) => {
   guardNetwork(t);
   let replies = 0;
   const rejectedReply = new Error("falha simulada do Discord");
   const interaction = interactionFor("example.com", []);
-  interaction.reply = async () => {
+  interaction.editReply = async () => {
     replies += 1;
     throw rejectedReply;
   };
   await withStatusChecker(
     async () => ({ origin: "https://example.com", status: 200 }),
     async (command) => {
-      await assert.rejects(command.execute(interaction), (error) => {
-        assert.equal(error, rejectedReply);
-        return true;
-      });
+      await assert.rejects(command.execute(interaction));
     },
   );
   assert.equal(replies, 1);

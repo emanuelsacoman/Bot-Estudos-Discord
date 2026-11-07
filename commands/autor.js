@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { respond, runSecondary } = require("../lib/interactions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -36,7 +37,7 @@ module.exports = {
       '❤️'
     ];
 
-    const message = await interaction.reply({
+    const message = await respond(interaction, {
       embeds: [exampleEmbed],
       components: [row],
       fetchReply: true
@@ -44,7 +45,7 @@ module.exports = {
 
     for (let i = 0; i < 3; i++) {
       const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-      await message.react(randomEmoji);
+      await runSecondary(() => message.react(randomEmoji));
     }
   },
 };

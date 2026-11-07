@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { deferResponse, respond } = require("../lib/interactions");
 const path = require('path');
 
 module.exports = {
@@ -7,6 +8,7 @@ module.exports = {
     .setDescription('Uma rádio Lofi para relaxar e estudar!'),
 
   async execute(interaction) {
+    let payload;
     try {
       const loFiRadioURL = process.env.LOFIRADIO_URL || 'https://lofiradio.web.app';
 
@@ -38,17 +40,18 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(linkButton);
 
-      await interaction.reply({
+      payload = {
         embeds: [exampleEmbed],
         components: [row],
         files: [
           { attachment: thumbnailPath, name: thumbnailName },
           { attachment: imagePath, name: imageName }
         ],
-      });
-    } catch (error) {
-      console.error('Erro ao executar /lofiradio:', error);
-      await interaction.reply({ content: 'Ocorreu um erro ao exibir Lofi Radio. Tente novamente mais tarde.', ephemeral: true });
+      };
+    } catch {
+      payload = { content: 'Ocorreu um erro ao exibir Lofi Radio. Tente novamente mais tarde.', ephemeral: true };
     }
+    if (payload.files) await deferResponse(interaction);
+    await respond(interaction, payload);
   },
 };

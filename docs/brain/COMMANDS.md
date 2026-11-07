@@ -6,12 +6,16 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 **Atualização P1.1 — 2026-11-07, base `develop` / `49138e6`:** `/status` passou a usar transporte seguro do Node; contratos slash dos 23 comandos continuam idênticos ao P0. Suíte permanente de SSRF/interação simulada e carregamento passa offline; resultados e limites em [QUALITY_GATES](QUALITY_GATES.md).
 
+**Atualização P1.2 — 2026-11-07, base `develop` / `234f01b` (`P1.1` já commitada):** todos os comandos usam a continuação compartilhada de respostas. Operações HTTP, formatação e geração/envio de arquivos têm reconhecimento prévio; nomes, opções, mensagens e visibilidade dos ramos existentes foram preservados. As alterações P1.2 estão sem commit; evidências e limites em [QUALITY_GATES](QUALITY_GATES.md).
+
 - Todos os módulos exportam `data` e `execute(interaction)`. O [runtime](../../index.js) carrega os arquivos `.js`; o [registro global](../../deploy-commands.js) serializa os mesmos módulos. Carregar ou serializar um módulo localmente não comprova registro remoto.
 - Todas as opções de entrada documentadas são **obrigatórias**. Somente `/formatar` define escolhas fechadas; os demais textos são livres. Não há `setMinValue`, `setMaxValue`, `setMinLength` ou `setMaxLength` nos builders atuais.
 - O runtime aplica cooldown de **5 segundos por comando e usuário**, comum a todos os servidores daquele processo. Nenhum módulo configura cooldown próprio. O timestamp é registrado antes de executar; uma execução que falha também consome o intervalo. Reiniciar perde os cooldowns. Menus não passam por esse controle.
 - Respostas normais são públicas, exceto `/ping`. Respostas efêmeras específicas são indicadas abaixo; o bloqueio de cooldown também é efêmero.
-- Nenhum comando chama `deferReply()`. Consultas HTTP, formatação e geração de arquivos podem atrasar o primeiro reconhecimento da interação: `KNOWN_RISK`. Apenas `/status` define timeout HTTP explícito.
-- Tratamento central de erros tenta `reply()` sem verificar `replied`/`deferred`; uma falha depois da primeira resposta pode impedir o aviso de erro. Erros locais capturados podem também tentar responder novamente. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
+- [interactions.js](../../lib/interactions.js) usa `reply()` antes do reconhecimento, `editReply()` após defer ainda pendente e `followUp()` depois de uma resposta concluída. Os sete comandos HTTP deferem antes da consulta; `/question` sem pergunta e `/http` 1xx respondem imediatamente. `/formatar`, `/qrcode` e o envio de anexos de `/lofiradio` também deferem antes do trabalho demorado.
+- A privacidade do reconhecimento original é imutável. Quando um ramo efêmero sucede defer público, o helper edita o loading com U+200B neutro, envia o conteúdo privado em follow-up com flag 64 e remove o placeholder. Nenhum erro privado é colocado na resposta pública; uma falha nessa sequência interrompe novas tentativas e pode deixar o placeholder neutro.
+- Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros sem corpo, URL ou configuração remota.
+- O listener trata erros conforme o estado da interação, sem repetir envios que falharam ou já foram reportados. Expiração local (3 s sem reconhecimento ou 15 min para interação reconhecida, desde a criação) e códigos terminais impedem novo envio. O erro central inicial continua público; depois do reconhecimento herda a visibilidade estabelecida. Falhas de reações, envio tardio do timer e exclusão do QR após sucesso são capturadas como operações secundárias. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
 - Todos dependem de `discord.js`, diretamente ou pelo builder transitivo indicado em `/translate`. Permissões de acesso ao canal, envio, embeds, anexos e reações devem ser verificadas conforme o recurso usado. Os builders não impõem permissões administrativas ou restrição explícita a servidores.
 
 ## Inventário
@@ -50,7 +54,7 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 Envia embed sobre Emanuel Vinícius Sacoman e a origem do CodeBucket no TCC de Análise e Desenvolvimento de Sistemas, botão para seu perfil GitHub e três reações aleatórias sequenciais. Usa a API de mensagens/reações do Discord; avatar é uma URL pública do GitHub.
 
-**Erros e limites:** as reações podem repetir e dependem de permissões. Não há catch local; falha de reação acontece depois de enviar a resposta. A biografia é conteúdo estático do código, sem consulta ao GitHub.
+**Erros e limites:** as reações podem repetir e dependem de permissões. Cada reação é protegida por `runSecondary`; uma falha após a mensagem não provoca nova resposta nem expõe o erro bruto. A biografia é conteúdo estático do código, sem consulta ao GitHub.
 
 ### `/count`
 
@@ -96,11 +100,11 @@ O embed usa a entrada em maiúsculas como título e o enunciado sorteado como de
 
 **Fonte:** [formatar.js](../../commands/formatar.js). **Opções:** `linguagem` — string obrigatória com escolhas `JavaScript → babel`, `HTML → html`, `CSS → css`, `JSON → json`, `Markdown → markdown`; `codigo` — string obrigatória.
 
-Executa `await prettier.format(codigo, { parser: linguagem })` e envia o resultado em campo de embed com bloco de código. Usa Prettier localmente, sem executar o código enviado e sem API externa.
+Reconhece a interação com defer público antes de `await prettier.format(codigo, { parser: linguagem })` e envia o resultado em campo de embed com bloco de código, usando a continuação compartilhada. Usa Prettier localmente, sem executar o código enviado e sem API externa.
 
 **Dependência e histórico:** Prettier `3.5.3` é dependência de produção (`^3.5.3`), pois é importado durante o carregamento de todos os comandos. Na auditoria inicial estava em `devDependencies`; a Fase 1 corrigiu essa classificação ([R02](KNOWN_RISKS.md#r02)), preservando faixa e versão resolvida. Instalação limpa com `--omit=dev` e carregamento dos comandos passaram em Node `24.22.2`/npm `11.19.1`. O `execute` real de `/formatar` passou nos cinco parsers (`babel`, `html`, `css`, `json`, `markdown`) usando resposta simulada, em ambos os modos de instalação, sem chamadas de rede. Envio real no Discord continua `NOT_CONFIRMED`; consulte [QUALITY_GATES.md](QUALITY_GATES.md).
 
-**Erros e limites:** não divide saídas grandes para os limites de campos/embeds do Discord. Catch envia erro efêmero sugerindo conferir a sintaxe, inclusive quando a causa é outra. Comportamento do formatador não foi refatorado na Fase 1.
+**Erros e limites:** não divide saídas grandes para os limites de campos/embeds do Discord. Falha de formatação/construção do embed mantém erro efêmero sugerindo conferir a sintaxe, inclusive quando a causa é outra. O envio fica fora desse catch; falha de envio não é confundida com erro de sintaxe nem provoca retry. A semântica de formatação foi preservada em P1.2.
 
 ### `/git`
 
@@ -114,9 +118,9 @@ Retorna embed estático com referências a `init`, `clone`, `stash`, `status`, `
 
 **Fonte:** [github.js](../../commands/github.js). **Opções:** `repositorio` — string obrigatória; formato esperado na descrição: `usuario/repositorio`.
 
-Usa `fetch` global em `https://api.github.com/repos/${repository}`. Para HTTP 200 exibe proprietário/avatar, nome completo, descrição, linguagem, estrelas, forks e URL em embed. Qualquer outro status recebe “Repositório não encontrado.”
+Defer público antes de `fetchJson` em `https://api.github.com/repos/${repository}`; o helper usa `fetch` global com prazo total de 5000 ms para requisição e leitura do JSON. Para HTTP 200 exibe proprietário/avatar, nome completo, descrição, linguagem, estrelas, forks e URL em embed. Qualquer outro status recebe “Repositório não encontrado.” Todos esses ramos continuam públicos.
 
-**Erros e limites:** requer runtime com `fetch` global; não importa `node-fetch`. Não valida o formato, não autentica e não define timeout. Status de limite de API e falhas de autenticação podem ser confundidos com repositório ausente. Fallbacks após template strings não substituem `null`/`undefined`, que se tornam texto. Catch envia mensagem pública genérica.
+**Erros e limites:** requer runtime com `fetch` global; não importa `node-fetch`. Não valida o formato nem autentica. Status de limite de API e falhas de autenticação podem ser confundidos com repositório ausente. Fallbacks após template strings não substituem `null`/`undefined`, que se tornam texto. Falhas HTTP, timeout ou corpo inesperado produzem mensagem pública genérica, sem log bruto; falha na continuação de envio não provoca nova resposta.
 
 ### `/help`
 
@@ -130,9 +134,9 @@ Lê `interaction.client.commands` e monta um campo de embed para cada nome/descr
 
 **Fonte:** [http.js](../../commands/http.js). **Opções:** `codigo` — integer obrigatório, sem intervalo declarado.
 
-Valores 100–199 recebem descrição genérica local de código informativo. Os demais usam axios GET em `https://httpstat.us/${code}?json`, aceitando qualquer status com `validateStatus: () => true`. Espera corpo com `code` e `description`; colore o embed conforme a faixa e inclui link em `httpstatuses.com`.
+Valores 100–199 recebem descrição genérica local de código informativo, sem defer nem HTTP. Os demais deferem publicamente e usam axios GET via `getJson` em `https://httpstat.us/${code}?json`, com prazo total de 5000 ms e aceitando qualquer status com `validateStatus: () => true`. Espera corpo com `code` e `description`; colore o embed conforme a faixa e inclui link em `httpstatuses.com`.
 
-**Erros e limites:** não define timeout nem restringe código a valores existentes. Corpo sem `data.code` recebe aviso efêmero; exceção gera erro efêmero. O contrato atual do corpo remoto e a disponibilidade dos links são `NOT_CONFIRMED`.
+**Erros e limites:** não restringe código a valores existentes. Corpo sem `data.code` recebe aviso efêmero; exceção/timeout gera erro efêmero, preservado mesmo após defer público. Falhas do envio são tratadas separadamente. O contrato atual do corpo remoto e a disponibilidade dos links são `NOT_CONFIRMED`.
 
 ### `/invite`
 
@@ -140,31 +144,31 @@ Valores 100–199 recebem descrição genérica local de código informativo. Os
 
 Exibe embed e botão OAuth com `process.env.INVITE_URL` ou fallback público com aplicação `1193011045577523300`, `permissions=0` e scopes `bot applications.commands`; adiciona reação de coração.
 
-**Erros e limites:** o fallback não deriva de `CLIENT_ID` e pode apontar para outra aplicação. Permissões zero na URL não garantem os recursos de anexos e reações. URL inválida ou reação sem permissão podem falhar; não há catch local. O bot apenas compartilha o link, sem alterar instalação remota nesta execução.
+**Erros e limites:** o fallback não deriva de `CLIENT_ID` e pode apontar para outra aplicação. Permissões zero na URL não garantem os recursos de anexos e reações. URL inválida pode falhar antes da resposta; a reação posterior é protegida por `runSecondary`, sem nova mensagem de erro ao usuário. O bot apenas compartilha o link, sem alterar instalação remota nesta execução.
 
 ### `/lofiradio`
 
 **Fonte:** [lofiradio.js](../../commands/lofiradio.js). **Opções:** nenhuma.
 
-Usa `process.env.LOFIRADIO_URL` ou `https://lofiradio.web.app`, envia embed com botão e anexa [lofiicon.png](../../images/lofiicon.png) e [lofiradio.jpeg](../../images/lofiradio.jpeg). Caminhos são montados com `path` e `__dirname`.
+Usa `process.env.LOFIRADIO_URL` ou `https://lofiradio.web.app`, prepara embed com botão e anexa [lofiicon.png](../../images/lofiicon.png) e [lofiradio.jpeg](../../images/lofiradio.jpeg). Caminhos são montados com `path` e `__dirname`; defer público precede o envio dos anexos.
 
-**Erros e limites:** apenas compartilha um site externo; não transmite áudio e não entra em canal de voz. Depende dos dois arquivos e da permissão de anexar/mostrar embeds. Catch tenta responder erro efêmero; disponibilidade e estações do site não foram verificadas.
+**Erros e limites:** apenas compartilha um site externo; não transmite áudio e não entra em canal de voz. Depende dos dois arquivos e da permissão de anexar/mostrar embeds. Falha ao preparar o conteúdo gera erro efêmero antes do defer; falha no envio não provoca uma segunda mensagem. Disponibilidade e estações do site não foram verificadas.
 
 ### `/moeda`
 
 **Fonte:** [moeda.js](../../commands/moeda.js). **Opções:** `valor` — number obrigatório; `origem` e `destino` — strings obrigatórias, exemplos USD/EUR na descrição.
 
-Converte códigos para maiúsculas, usa axios GET em `https://api.exchangerate-api.com/v4/latest/${origem}`, busca `rates[destino]`, multiplica pelo valor e arredonda com `toFixed(2)`. Embed mostra valor original, convertido e taxa.
+Converte códigos para maiúsculas, defere publicamente e usa axios GET via `getJson` em `https://api.exchangerate-api.com/v4/latest/${origem}`, com prazo total de 5000 ms. Busca `rates[destino]`, multiplica pelo valor e arredonda com `toFixed(2)`. Embed público mostra valor original, convertido e taxa.
 
-**Erros e limites:** não valida positividade, não faz trim e não define timeout. Destino sem taxa gera erro efêmero; HTTP 404 é interpretado como origem inválida; demais falhas recebem erro efêmero genérico. Atualização e precisão das taxas dependem do serviço externo, `NOT_CONFIRMED` nesta auditoria.
+**Erros e limites:** não valida positividade nem faz trim. Destino sem taxa gera erro efêmero; HTTP 404 é interpretado como origem inválida; demais falhas/timeout recebem erro efêmero genérico. Esses ramos permanecem privados após defer público, e falha de envio não repete resposta. Atualização e precisão das taxas dependem do serviço externo, `NOT_CONFIRMED` nesta auditoria.
 
 ### `/ping`
 
 **Fonte:** [ping.js](../../commands/ping.js). **Opções:** nenhuma.
 
-Responde **efemeramente** com “Pong!”, mede a duração de `await interaction.reply()` por `Date.now()` e edita a mesma resposta com a latência em ms.
+Responde **efemeramente** com “Pong!” via `respond`, mede a duração da resposta inicial por `Date.now()` e usa `editResponse` para editar a mesma mensagem com a latência em ms.
 
-**Erros e limites:** a medida representa o tempo da resposta inicial, sem usar `client.ws.ping` e sem medir todas as condições de rede. Não há catch local; `editReply` pode falhar após a primeira resposta.
+**Erros e limites:** a medida representa o tempo da resposta inicial, sem usar `client.ws.ping` e sem medir todas as condições de rede. Falha na resposta ou edição interrompe novos envios; o handler central não tenta repetir uma operação de resultado ambíguo.
 
 ### `/playlist`
 
@@ -172,31 +176,31 @@ Responde **efemeramente** com “Pong!”, mede a duração de `await interactio
 
 Envia embed, um follow-up público com URL fixa da playlist Spotify `3FbsZmt8BrFFmVpKD4ju4H` e uma reação aleatória ao follow-up.
 
-**Erros e limites:** compartilha link, sem consulta à API Spotify e sem reprodução de áudio. Falha de reação pode ocorrer após as duas mensagens serem enviadas. Disponibilidade da playlist `NOT_CONFIRMED`; sem catch local.
+**Erros e limites:** compartilha link, sem consulta à API Spotify e sem reprodução de áudio. Falha da reação é capturada por `runSecondary` após as duas mensagens, sem provocar nova resposta. Disponibilidade da playlist `NOT_CONFIRMED`.
 
 ### `/qrcode`
 
 **Fonte:** [qrcode.js](../../commands/qrcode.js). **Opções:** `link` — string obrigatória.
 
-Usa `qrcode.toFile()` para gerar `qrcode_${Date.now()}.png` no diretório de trabalho, envia como imagem anexa a um embed e apaga o arquivo com `fs.unlinkSync()` depois do reply. Usa `qrcode` e `fs`; não acessa o endereço codificado.
+Defere publicamente antes de usar `qrcode.toFile()` para gerar `qrcode_${Date.now()}.png` no diretório de trabalho; envia como imagem anexa a um embed e tenta apagar o arquivo com `fs.unlinkSync()` depois da resposta. Usa `qrcode` e `fs`; não acessa o endereço codificado.
 
-**Erros e limites:** aceita texto arbitrário sem validar URL; requer escrita no diretório de execução. `Date.now()` permite colisões no mesmo milissegundo. O helper captura/loga falha de geração e permite continuar para envio do arquivo ausente. Não há `finally`: falha de resposta pode deixar arquivo no disco. Falhas de exclusão propagam depois da resposta.
+**Erros e limites:** aceita texto arbitrário sem validar URL; requer escrita no diretório de execução. `Date.now()` permite colisões no mesmo milissegundo. Falha de geração agora propaga ao tratamento central e interrompe o envio do anexo ausente. A exclusão após sucesso é protegida por `runSecondary`, sem nova resposta em caso de falha. Não há `finally`: falha de geração/envio ou limpeza recusada ainda pode deixar arquivo no disco (R10 residual).
 
 ### `/question`
 
 **Fonte:** [question.js](../../commands/question.js). **Opções:** `pergunta` — string obrigatória; descrição solicita inglês.
 
-Usa axios GET em `https://api.stackexchange.com/2.3/search`, com `order=desc`, `sort=activity`, `intitle` codificado e `site=stackoverflow`. Exibe título e link do **primeiro resultado por atividade**, sem buscar o conteúdo da resposta. Não há IA nem resposta automática à pergunta.
+Defere publicamente antes de axios GET via `getJson` em `https://api.stackexchange.com/2.3/search`, com prazo total de 5000 ms, `order=desc`, `sort=activity`, `intitle` codificado e `site=stackoverflow`. Exibe título e link do **primeiro resultado por atividade**, sem buscar o conteúdo da resposta. Não há IA nem resposta automática à pergunta.
 
-**Erros e limites:** entrada vazia, ausência de resultados e exceções geram respostas efêmeras. Não há timeout nem controle de quota/backoff. Variável `answerLink` é calculada e não usada; o campo “Answer link” aponta para a própria pergunta. Idioma inglês é solicitado, sem validação ou tradução.
+**Erros e limites:** entrada vazia recebe resposta efêmera imediata, sem defer/HTTP; ausência de resultados e exceções/timeout também permanecem efêmeros após defer público. Não há controle de quota/backoff. Variável `answerLink` é calculada e não usada; o campo “Answer link” aponta para a própria pergunta. Idioma inglês é solicitado, sem validação ou tradução.
 
 ### `/repositorys`
 
 **Fonte:** [repositorys.js](../../commands/repositorys.js). **Opções:** `linguagem` — string obrigatória. O nome público é exatamente `repositorys`.
 
-Usa axios GET em `https://api.github.com/search/repositories?q=language:${linguagem}&sort=stars&order=desc`. Seleciona até cinco itens e envia texto público com nome completo, link e estrelas. Ausência de resultados recebe mensagem pública.
+Defere publicamente antes de axios GET via `getJson` em `https://api.github.com/search/repositories?q=language:${linguagem}&sort=stars&order=desc`, com prazo total de 5000 ms. Seleciona até cinco itens e envia texto público com nome completo, link e estrelas. Ausência de resultados recebe mensagem pública.
 
-**Erros e limites:** a entrada não é codificada na URL, permitindo caracteres que alteram a consulta. Não há autenticação, timeout ou tratamento específico de rate limit. Catch loga e responde erro público. Não garante cinco resultados se houver menos.
+**Erros e limites:** a entrada não é codificada na URL, permitindo caracteres que alteram a consulta. Não há autenticação nem tratamento específico de rate limit. Falha HTTP/timeout mantém erro público, sem log bruto. Não garante cinco resultados se houver menos.
 
 ### `/servercount`
 
@@ -212,9 +216,9 @@ Envia embed com `interaction.client.guilds.cache.size`. Não consulta armazename
 
 Adiciona `https://` a domínios sem esquema e preserva `url` obrigatória, nome, descrição e contrato `data`/`execute`. Faz GET usando [status-http.js](../../lib/status-http.js) e HTTP/HTTPS nativos do Node. Aceita somente HTTP(S), sem credenciais; canoniza IPs alternativos, bloqueia localhost e destinos privados, loopback, link-local, metadata e faixas especiais IPv4/IPv6. Valida todos os endereços retornados pelo DNS; qualquer resposta não pública recusa a consulta inteira. Conecta diretamente ao primeiro IP aprovado, sem nova resolução, preservando Host e domínio original para SNI/certificado TLS; não usa proxy/agente global nem segue redirecionamentos.
 
-Prazo de **5000 ms** cobre DNS, conexão, TLS e corpo; limites de **1 MiB** de corpo bruto, **16 KiB** de cabeçalhos e **2048 caracteres** de entrada. Corpo é descartado sem descompressão; respostas contêm somente origem (protocolo/domínio/porta) e status numérico, sem caminho, query, fragmento, cabeçalhos ou detalhes internos. HTTP 2xx gera embed verde “Online”; 3xx/4xx/5xx mantém embed vermelho “Offline ou inacessível” com o código recebido. Falhas de validação/DNS/conexão/timeout/limite geram mensagem genérica vermelha, sem repetir a entrada. Há somente uma tentativa local de reply.
+Prazo de **5000 ms** cobre DNS, conexão, TLS e corpo; limites de **1 MiB** de corpo bruto, **16 KiB** de cabeçalhos e **2048 caracteres** de entrada. Corpo é descartado sem descompressão; respostas contêm somente origem (protocolo/domínio/porta) e status numérico, sem caminho, query, fragmento, cabeçalhos ou detalhes internos. HTTP 2xx gera embed verde “Online”; 3xx/4xx/5xx mantém embed vermelho “Offline ou inacessível” com o código recebido. Falhas de validação/DNS/conexão/timeout/limite geram mensagem genérica vermelha, sem repetir a entrada. P1.2 adiciona defer público antes da consulta e conclui com `respond`; todos os ramos continuam públicos, sem retry de envio.
 
-**Erros e limites:** R06 `RESOLVED` no escopo dos testes controlados, incluindo transporte nativo com sockets em memória e prova do IP conectado. A política conservadora recusa todo IPv4-mapped IPv6, tradução/transição e alguns blocos especiais globalmente roteáveis. Não há fallback entre IPs públicos nem redirects; sites online podem ser recusados por essas restrições ou pelos limites. Não há allowlist fixa de domínios. A semântica antiga para HTTP não 2xx foi preservada e não comprova indisponibilidade do servidor. Esperar até 5 s sem defer ainda pode expirar a interação (R07); uma falha de envio propaga ao handler global (R05). Consultas reais e operação no Discord permanecem `NOT_CONFIRMED`.
+**Erros e limites:** R06 `RESOLVED` no escopo dos testes controlados, incluindo transporte nativo com sockets em memória e prova do IP conectado; o helper SSRF não foi alterado em P1.2. A política conservadora recusa todo IPv4-mapped IPv6, tradução/transição e alguns blocos especiais globalmente roteáveis. Não há fallback entre IPs públicos nem redirects; sites online podem ser recusados por essas restrições ou pelos limites. Não há allowlist fixa de domínios. A semântica antiga para HTTP não 2xx foi preservada e não comprova indisponibilidade do servidor. O prazo HTTP agora ocorre após o reconhecimento, e falha de envio é marcada para o tratamento central não repetir a tentativa. Consultas reais e operação no Discord permanecem `NOT_CONFIRMED`.
 
 ### `/timer`
 
@@ -222,7 +226,7 @@ Prazo de **5000 ms** cobre DNS, conexão, TLS e corpo; limites de **1 MiB** de c
 
 Mantém objeto `timers` por `interaction.user.id` na memória do processo, compartilhado entre servidores. `set` cancela eventual timer anterior daquele usuário, agenda `setTimeout(tempo * 60 * 1000)` e confirma publicamente com menção/embed. No vencimento tenta enviar nova mensagem ao canal original. `stop` cancela/remove a referência e confirma; ausência de timer recebe resposta efêmera.
 
-**Erros e limites:** reinício perde timers; não há persistência nem isolamento por servidor. Zero, negativos e valores muito grandes não são barrados. O callback não aguarda nem captura `channel.send()` e não remove a referência quando o timer vence. O catch de `execute` apenas loga, podendo deixar interação sem resposta; não cobre rejeições futuras do callback. Uma referência vencida pode ainda ser considerada timer existente por `stop`.
+**Erros e limites:** reinício perde timers; não há persistência nem isolamento por servidor. Zero, negativos e valores muito grandes não são barrados. O envio tardio é aguardado dentro de `runSecondary`, que captura rejeições sem reutilizar o token da interação. Falhas de execução propagam ao tratamento central; o handle ainda não é removido ao vencer e uma referência vencida pode ser considerada timer existente por `stop`. Limites, estado e escopo permanecem riscos residuais de R08/R09.
 
 ### `/todo`
 
@@ -236,9 +240,9 @@ Usa `Map<userId, array>` em memória. `add` bloqueia duplicata textual exata, ac
 
 **Fonte:** [translate.js](../../commands/translate.js). **Opções:** `idioma` — string obrigatória com sigla de destino; `texto` — string obrigatória.
 
-Importa `SlashCommandBuilder` de `@discordjs/builders` (dependência transitiva de discord.js) e axios. Consulta `https://translate.googleapis.com/translate_a/single` com `client=gtx`, `sl=auto`, `tl=${idioma}`, `dt=t` e texto codificado em `q`. Extrai apenas `response.data[0][0][0]` e responde publicamente com menção ao usuário e tradução.
+Importa `SlashCommandBuilder` de `@discordjs/builders` (dependência transitiva de discord.js). Defere publicamente e usa axios via `getJson` para consultar `https://translate.googleapis.com/translate_a/single`, com prazo total de 5000 ms, `client=gtx`, `sl=auto`, `tl=${idioma}`, `dt=t` e texto codificado em `q`. Extrai apenas `response.data[0][0][0]` e responde publicamente com menção ao usuário e tradução.
 
-**Erros e limites:** não valida idioma, não codifica a sigla, não define timeout e pressupõe formato específico do corpo. Pode descartar segmentos adicionais da tradução. Não existe chave/configuração de Google Cloud no projeto; contrato, estabilidade e uso permitido desse endpoint são `NOT_CONFIRMED`. Catch loga e responde erro efêmero. A importação depende da resolução de um pacote não declarado diretamente.
+**Erros e limites:** não valida idioma nem codifica a sigla e pressupõe formato específico do corpo. Pode descartar segmentos adicionais da tradução. Não existe chave/configuração de Google Cloud no projeto; contrato, estabilidade e uso permitido desse endpoint são `NOT_CONFIRMED`. Falha HTTP/timeout/corpo inesperado mantém erro efêmero, sem log bruto, mesmo após defer público. A importação depende da resolução de um pacote não declarado diretamente.
 
 ### `/vote`
 
@@ -246,7 +250,7 @@ Importa `SlashCommandBuilder` de `@discordjs/builders` (dependência transitiva 
 
 Envia embed, botão para `https://top.gg/bot/1193011045577523300` e reação de estrela. Não consulta API top.gg e não confirma se o usuário votou.
 
-**Erros e limites:** aplicação no link é fixa, independente de `CLIENT_ID`. Reação depende de permissões e pode falhar depois da resposta. Disponibilidade da página `NOT_CONFIRMED`; não há catch local.
+**Erros e limites:** aplicação no link é fixa, independente de `CLIENT_ID`. A reação depende de permissões e é protegida por `runSecondary`; falha posterior não provoca nova resposta. Disponibilidade da página `NOT_CONFIRMED`.
 
 ## Continuidade
 

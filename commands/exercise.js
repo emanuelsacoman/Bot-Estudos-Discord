@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond } = require("../lib/interactions");
 
 function gerarExercicio(linguagem) {
     const linguagens = {
@@ -461,6 +462,6 @@ module.exports = {
             .setFooter({text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png'})
             .setTimestamp();
 
-        await interaction.reply({ embeds: [exampleEmbed] });
+        await respond(interaction, { embeds: [exampleEmbed] });
     }
 };

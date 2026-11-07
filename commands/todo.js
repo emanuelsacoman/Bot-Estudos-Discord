@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond } = require("../lib/interactions");
 
 const userToDoLists = new Map();
 
@@ -45,7 +46,7 @@ module.exports = {
             if (subcommand === 'add') {
                 const task = interaction.options.getString('tarefa');
                 if (toDoList.includes(task)) {
-                    await interaction.reply({ content: `A tarefa "${task}" já está na sua lista.`, ephemeral: true });
+                    await respond(interaction, { content: `A tarefa "${task}" já está na sua lista.`, ephemeral: true });
                     return;
                 }
                 toDoList.push(task);
@@ -57,10 +58,10 @@ module.exports = {
                     .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                     .setTimestamp();
     
-                await interaction.reply({ embeds: [exampleEmbedAdd] });
+                await respond(interaction, { embeds: [exampleEmbedAdd] });
             } else if (subcommand === 'list') {
                 if (toDoList.length === 0) {
-                    await interaction.reply({content: "Sua lista de tarefas está vazia.", ephemeral: true });
+                    await respond(interaction, {content: "Sua lista de tarefas está vazia.", ephemeral: true });
                     return;
                 }
                 
@@ -76,11 +77,11 @@ module.exports = {
                     .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                     .setTimestamp();
     
-                await interaction.reply({ embeds: [exampleEmbedDel] });
+                await respond(interaction, { embeds: [exampleEmbedDel] });
             } else if (subcommand === 'remove') {
                 const index = interaction.options.getInteger('numero');
                 if (index < 1 || index > toDoList.length) {
-                    await interaction.reply({ content: "Por favor, especifique um número válido de tarefa para remover.", ephemeral: true });
+                    await respond(interaction, { content: "Por favor, especifique um número válido de tarefa para remover.", ephemeral: true });
                     return;
                 }
     
@@ -93,7 +94,7 @@ module.exports = {
                     .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                     .setTimestamp();
     
-                await interaction.reply({ embeds: [exampleEmbedDel] });
+                await respond(interaction, { embeds: [exampleEmbedDel] });
             }
         }
 };

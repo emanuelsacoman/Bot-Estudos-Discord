@@ -1,18 +1,20 @@
 # Arquitetura implementada
 
-Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização P1.1 na mesma data, a partir de `develop` / `49138e6` (`Fase 1/P0`), com o P0 já commitado. Node 24 e a classificação de Prettier vêm do P0; P1.1 altera a consulta de `/status` e adiciona testes permanentes, preservando os contratos públicos. As alterações P1.1 estão sem commit. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
+Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização P1.2 na mesma data, a partir de `develop` / `234f01b` (`P1.1` já commitada). Node 24 e Prettier de produção vêm do P0; a proteção SSRF e a suíte permanente vêm da P1.1. P1.2 compartilha respostas por estado e prazos HTTP, preservando os contratos públicos. As alterações P1.2 estão sem commit. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
 
 ## Componentes e responsabilidades
 
-É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Cada comando concentra definição pública e execução; `/status` delega validação de destino e transporte a um helper local. Não há camadas de domínio ou repositórios separadas, banco de dados, servidor HTTP próprio, fila, configuração de CI ou infraestrutura de hospedagem versionada. P1.1 adiciona uma suíte com `node:test` focada em SSRF, respostas de `/status` e contratos dos 23 comandos; as evidências estão em qualidade.
+É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Cada comando concentra definição pública e execução, com helpers locais para resposta, prazo HTTP e proteção de `/status`. Não há camadas de domínio ou repositórios separadas, banco de dados, servidor HTTP próprio, fila, CI ou infraestrutura de hospedagem versionada. A suíte `node:test` cobre SSRF, contratos, interações e falhas HTTP/secundárias; as evidências estão em qualidade.
 
 | Componente | Responsabilidade efetiva |
 |---|---|
 | [index.js](../../index.js) | Carrega configuração e módulos, instancia Client, conecta ao Gateway, trata eventos, cooldowns e select menu de documentação. |
 | [deploy-commands.js](../../deploy-commands.js) | Processo separado que importa os mesmos comandos e substitui sua definição global na API REST Discord v10. Não é chamado pelo runtime. |
-| [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; `/status` usa o helper abaixo e os demais mantêm comunicação externa e estado local nos próprios módulos. |
+| [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; definição pública e comportamento permanecem locais, delegando envio de respostas e prazos HTTP aos helpers. |
 | [lib/status-http.js](../../lib/status-http.js) | Política de URLs/IPs, resolução DNS e GET de `/status` preso a um IP validado, com limites e erros sanitizados. Usa somente módulos nativos do Node. |
-| [tests/](../../tests/) | Testes offline com `node:test`, DNS e transporte simulados; regressão dos contratos dos comandos e respostas de `/status`. |
+| [lib/interactions.js](../../lib/interactions.js) | Defer, reply/edit/followUp por estado, visibilidade, expiração, falhas sem retry e captura de operações secundárias. `runWithErrorHandling` envolve o listener. |
+| [lib/http-client.js](../../lib/http-client.js) | GET axios e fetch/JSON com prazo total de 5000 ms, cancelamento e erro sanitizado; não substitui a política SSRF de `/status`. |
+| [tests/](../../tests/) | Seis arquivos `node:test` com DNS, transporte e interações simulados; contratos, SSRF, estado/visibilidade de respostas, prazos HTTP e operações secundárias. |
 | [images/](../../images/) | Três imagens versionadas; `lofiradio.jpeg` e `lofiicon.png` são anexadas pelo comando Lofi. A presença de `topgg.png` não implica seu uso por `/vote`. |
 | [package.json](../../package.json), [package-lock.json](../../package-lock.json) | Faixas de dependências e resolução exata. Lockfile v3; entrada principal `index.js`; script `test` executa `node --test`. P1.1 não adiciona dependências. |
 | [.nvmrc](../../.nvmrc) | Versão exata Node `24.22.2`; `engines.node` em `package.json` declara a linha `24.x`. A ativação local está descrita em operação. |
@@ -35,7 +37,11 @@ flowchart TD
     Interaction --> Slash[isCommand: procura por nome]
     Slash --> Cooldown[Cooldown por usuário e comando]
     Cooldown --> Execute[execute interaction]
-    Execute --> APIs[HTTP externo / respostas Discord]
+    Execute --> APIs[HTTP externo]
+    Execute --> HTTP[lib/http-client.js: prazo e cancelamento]
+    HTTP --> APIs
+    Execute --> Responses[lib/interactions.js: resposta por estado]
+    Responses --> Discord[REST de respostas Discord]
     Execute --> Status[lib/status-http.js: destino validado]
     Status --> APIs
     Execute --> Memory[Map todo / objeto timers em memória]
@@ -60,7 +66,11 @@ O listener examina primeiro `isStringSelectMenu()`. Pega `values[0]`, consulta `
 
 Para `isCommand()`, procura o nome na Collection; se não encontrar, apenas registra erro e retorna. O cooldown é uma Collection por comando contendo timestamps por ID de usuário. Usa `(command.data.cooldown || 5) * 1000`; nenhum módulo define `data.cooldown`, portanto o padrão atual é cinco segundos. A chave não inclui servidor. Registra o timestamp antes de executar, mesmo quando a execução falha, e o remove por `setTimeout`; reinícios e outros processos não compartilham esse limite ([index.js:230–267](../../index.js#L230)).
 
-Há `try/catch` externo do listener, tratamento local de respostas do select/cooldown e tratamento de erros de `execute`. O erro de execução tenta sempre `interaction.reply`, sem distinguir resposta já enviada ou deferida. Vários módulos também têm seus próprios catches; não há camada comum para timeout, validação de schemas ou resposta de falha. Callbacks posteriores, como o envio no timer, ficam fora do alcance do `await command.execute` ([index.js:266–280](../../index.js#L266), [commands/timer.js:54–57](../../commands/timer.js#L54)).
+O listener inteiro é envolvido por `runWithErrorHandling`; select, cooldown e os 23 comandos usam `respond`. Sem reconhecimento, responde com reply; defer pendente usa editReply; resposta concluída usa followUp. `/ping` usa `editResponse` para editar a mensagem original privada. Uma WeakMap registra envio em andamento, falha e erro já reportado, evitando duplicação/retry após entrega ambígua. Códigos terminais e prazo local impedem novo envio; o tratamento da própria falha de resposta também é capturado. Logs novos usam somente mensagens fixas.
+
+Defer é público por padrão. Para manter erros efêmeros depois dele, o helper conclui o loading com U+200B neutro, envia o resultado privado em follow-up com flag 64 e remove o placeholder. A edição original nunca recebe conteúdo privado; uma falha encerra a sequência, podendo deixar o placeholder neutro. Isso respeita a visibilidade imutável do reconhecimento e evita a semântica especial do primeiro follow-up após defer, descrita no [contrato Discord](https://docs.discord.com/developers/interactions/receiving-and-responding).
+
+Reações, envio tardio do timer e cleanup QR pós-sucesso usam `runSecondary`, que aguarda/captura falha sem invalidar a resposta principal. Isso não altera limites, persistência ou escopo de estado. Geração de QR propaga falhas ao tratamento central; falha no envio ainda pode deixar arquivo temporário. Os prazos são verificados antes de cada chamada REST (3 s sem reconhecimento, 15 min após reconhecimento, desde a criação); rede/carga, relógio local e operação remota continuam limitações explícitas.
 
 ## Registro e autenticação
 
@@ -75,7 +85,7 @@ O registro não inicia o Client e o runtime não registra comandos remotamente. 
 | Dependência | Versão resolvida no lock | Uso observado |
 |---|---|---|
 | discord.js | 14.18.0 | Gateway, builders, Collections, respostas e registro REST; API REST v10. |
-| axios | 1.8.4 | Consultas HTTP em cinco comandos; `/status` usa `node:http` e `node:https`. |
+| axios | 1.8.4 | Consultas HTTP em cinco comandos via `lib/http-client.js`; `/status` usa `node:http` e `node:https`. |
 | dotenv | 16.4.7 | Configuração em `index.js` e `deploy-commands.js`. |
 | qrcode | 1.5.4 | Geração de PNG local. |
 | node-fetch | 3.3.2 | Declarado, mas sem importação encontrada; `/github` usa `fetch` global. |
@@ -96,7 +106,7 @@ Na auditoria inicial, Prettier era devDependency, embora importado por `/formata
 | URL fornecida pelo usuário | `/status`: GET HTTP(S) direto do Node, após política de destino e DNS; prazo total de 5000 ms, corpo até 1 MiB, cabeçalhos até 16 KiB, zero redirecionamentos | Sem autenticação; URLs com credenciais são rejeitadas. |
 | Spotify, top.gg, Lofi Radio, autor, documentação, imagens externas | Links, botões e imagens exibidos nas mensagens/presença | Não há integração OAuth/API própria nesses links. |
 
-As APIs HTTP são chamadas antes da primeira resposta, sem `deferReply`; somente `/status` define timeout HTTP explicitamente. Disponibilidade, rate limits, contratos atuais e destinos de links não foram verificados remotamente. As únicas variáveis de ambiente referenciadas no código são `TOKEN`, `CLIENT_ID`, `INVITE_URL` e `LOFIRADIO_URL`.
+Os sete comandos HTTP deferem antes da API. Axios e fetch/JSON têm prazo total de 5000 ms com AbortSignal; `/status` conserva seu prazo e transporte próprios. Validações rápidas de `/question` e `/http` 1xx não deferem nem consultam API. `/formatar`, `/qrcode` e upload Lofi também reconhecem antes do trabalho demorado. Disponibilidade, rate limits, contratos atuais e destinos de links não foram verificados remotamente. As únicas variáveis de ambiente da aplicação permanecem `TOKEN`, `CLIENT_ID`, `INVITE_URL` e `LOFIRADIO_URL`.
 
 ### Fronteira HTTP de `/status` — P1.1
 
@@ -104,7 +114,7 @@ O helper normaliza a URL com WHATWG, mantém HTTPS como padrão para entradas se
 
 Antes de conectar, `dns.lookup` obtém os endereços disponíveis com `all: true`; qualquer resultado não público invalida a consulta inteira. O transporte recebe o IP numérico aprovado como `hostname`, preservando Host e a identidade TLS do domínio original. Não há segunda resolução DNS, reutilização de conexão ou proxy do agente global (`agent: false`), e a validação de certificado permanece habilitada. `http.request`/`https.request` não seguem `Location`.
 
-Um prazo único de 5000 ms cobre DNS, conexão, TLS, cabeçalhos e corpo; uma resolução tardia não inicia nova requisição. O corpo é contado e descartado em streaming, sem armazenar, interpretar ou descomprimir conteúdo remoto. A interface mantém embeds verde/vermelho e os códigos HTTP; exibe somente a origem da URL, sem caminho ou query. Falhas usam uma mensagem fixa, sem erro bruto, corpo, cabeçalhos ou logs. O risco de prazo da interação Discord permanece em [R07](KNOWN_RISKS.md#r07), pois o comando continua sem `deferReply`.
+Um prazo único de 5000 ms cobre DNS, conexão, TLS, cabeçalhos e corpo; uma resolução tardia não inicia nova requisição. O corpo é contado e descartado em streaming, sem armazenar, interpretar ou descomprimir conteúdo remoto. A interface mantém embeds verde/vermelho e os códigos HTTP; exibe somente a origem da URL, sem caminho ou query. Falhas usam uma mensagem fixa, sem erro bruto, corpo, cabeçalhos ou logs. P1.2 acrescentou defer público e continuação da resposta, sem alterar esse helper SSRF ou seus testes; [R07](KNOWN_RISKS.md#r07) foi corrigido no escopo local.
 
 As faixas devem ser revistas quando os registros especiais [IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) e [IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/) da IANA mudarem. A semântica de agentes e proxies usada aqui está na [documentação HTTP do Node 24](https://nodejs.org/docs/latest-v24.x/api/http.html).
 
@@ -112,8 +122,8 @@ As faixas devem ser revistas quando os registros especiais [IPv4](https://www.ia
 
 - `/todo` mantém Map por usuário e `/timer` mantém objeto de handles por usuário: ambos voláteis, compartilhados entre servidores daquele processo, sem backup. Respostas normais são públicas; detalhes e riscos estão no [catálogo](COMMANDS.md) e em [R09](KNOWN_RISKS.md#r09).
 - `/qrcode` grava PNG no diretório de execução, anexa e remove o arquivo após reply bem-sucedido. Diferentemente das imagens Lofi, seu caminho não parte de `__dirname`.
-- Runtime e registro importam todos os módulos: uma dependência ausente em um comando afeta ambos. Carregamento, respostas e lógica de negócio não estão isolados.
+- Runtime e registro importam todos os módulos: uma dependência ausente em um comando/helper afeta ambos. Carregamento continua acoplado; respostas e prazos HTTP têm helpers locais compartilhados.
 - `/docs` distribui a definição do menu no módulo e a interpretação das opções em `index.js`. `/help` deriva dinamicamente nomes e descrições da Collection de comandos carregados, sem consultar o registro remoto.
 - IDs, cores, rodapés, links e mensagens estão repetidos nos comandos. Não há configuração central desses dados.
 
-Oportunidades **propostas, sem refatoração nesta tarefa**: compartilhar validação/carregamento entre runtime e registro, extrair roteamento de componentes, centralizar cliente HTTP e tratamento de respostas, explicitar configuração e decidir persistência/privacidade de estado. A sequência sugerida está em [ROADMAP.md](ROADMAP.md); não representa decisões históricas ou aprovação de implementação.
+Oportunidades **propostas, sem implementação adicional nesta tarefa**: compartilhar validação/carregamento entre runtime e registro, rotear componentes por contrato explícito, validar schemas externos, explicitar configuração e decidir persistência/privacidade de estado. Respostas e prazo HTTP já foram compartilhados na P1.2. A sequência sugerida está em [ROADMAP.md](ROADMAP.md); não representa aprovação automática de implementação.

@@ -1,6 +1,6 @@
 # Operação e recuperação
 
-Atualizado na **P1.1, 2026-11-07**, base `develop` / `49138e6` (P0 já commitado). Instalações limpas normal e de produção e verificações offline foram **executadas** com Node 24.22.2/npm 11.19.1 em P0 e P1.1. As alterações P1.1 estão sem commit. Login, registro, hospedagem e recuperação integral continuam apenas documentados, sem execução. Veja os resultados em [QUALITY_GATES](QUALITY_GATES.md). Os exemplos usam PowerShell, a partir da raiz do repositório.
+Atualizado na **P1.2, 2026-11-07**, base `develop` / `234f01b` (P1.1 já commitada). Instalações limpas normal/produção foram executadas em P0/P1.1; P1.2 validou interações e prazos HTTP offline com a instalação existente, sem alterar manifest/lock. Node 24.22.2/npm 11.19.1; alterações P1.2 sem commit. Login, registro, hospedagem e recuperação integral continuam apenas documentados, sem execução. Veja [QUALITY_GATES](QUALITY_GATES.md). Os exemplos usam PowerShell, a partir da raiz.
 
 ## Preparar Node.js e dependências
 
@@ -51,7 +51,7 @@ Os testes usaram diretórios inicialmente sem `node_modules`/`.env`: `node_modul
 
 `npm ci` recria o `node_modules` do alvo: não aplique na instalação existente sem preparar o ambiente e preservar alterações locais pertinentes. Não remova/atualize o lock para contornar erros. [Comportamento oficial de npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci).
 
-Em P1.1, as duas variantes passaram novamente em `node_modules/.codebucket-p1/ci-development` e `ci-production`, com `--offline` e os caches P0 já preenchidos. `npm test` agora executa a suíte permanente offline de SSRF, interface de `/status` e contratos dos 23 comandos; as instruções para o runtime portátil estão em [qualidade](QUALITY_GATES.md). Distribua também `lib/status-http.js`: ele é importado por `/status` durante o carregamento de todos os comandos.
+Em P1.1, as duas variantes passaram novamente em `node_modules/.codebucket-p1/ci-development` e `ci-production`, com `--offline` e os caches P0 já preenchidos. `npm test` executa a suíte offline de SSRF, contratos, interações, HTTP e operações secundárias, sem precisar de `.env`; instruções para o runtime portátil em [qualidade](QUALITY_GATES.md). Distribua todo `lib/`: os comandos importam os helpers de resposta, prazo HTTP e SSRF durante o carregamento. P1.2 não adiciona dependências.
 
 ## Configurar ambiente e autenticação
 
@@ -112,25 +112,26 @@ Não há desligamento gracioso, persistência ou recuperação de tarefas. Toda 
 | `Cannot find module 'prettier'` na inicialização/registro | Em commits anteriores à Fase 1, Prettier estava em devDependencies. Conferir manifest/lock atuais e instalação limpa; agora produção inclui Prettier, sem exigir `--include=dev`. Não copiar `node_modules` antigo como correção. |
 | Token inválido ou bot não chega a `ready` | Verificar segredo local, conexão de saída e aplicação; não imprimir token. `login` não tem catch explícito. |
 | Slash command ausente | Separar carregamento local de registro global/instalação OAuth. Confirmar aplicação e permissões; não rodar registro repetidamente como diagnóstico automático. |
-| “A aplicação não respondeu” / interação desconhecida | Há operações HTTP/arquivo antes do primeiro reply, sem defer. Discord exige resposta inicial em até 3 segundos; timeout de `/status` é 5 segundos. [Contrato de respostas](https://docs.discord.com/developers/interactions/receiving-and-responding). |
-| “InteractionAlreadyReplied” ou erro após sucesso aparente | Falha em reação/follow-up pode ocorrer após resposta; catch global tenta novo `reply` indiscriminadamente. |
-| Falha HTTP / resultado inesperado | Verificar limite, status e formato esperado da API. `/github` mapeia qualquer não 200 para inexistente; `/status` pode chamar 4xx/5xx de offline. Não há política central de retry/backoff. |
+| “A aplicação não respondeu” / interação desconhecida | P1.2 reconhece antes das operações demoradas. Conferir atraso de entrega/event loop/rede: o defer também pode falhar. Interações expiradas não são reenviadas; o prazo inicial continua 3 s e o token reconhecido vale 15 min desde a criação. [Contrato de respostas](https://docs.discord.com/developers/interactions/receiving-and-responding). |
+| “InteractionAlreadyReplied” ou erro após sucesso aparente | P1.2 escolhe continuação por estado e não tenta novo envio após falha de entrega. Reações são secundárias e capturadas; erro inesperado após sucesso pode gerar follow-up conforme visibilidade já estabelecida. Não repetir manualmente uma operação sem conferir o efeito anterior. |
+| Loading/placeholder neutro permanece após erro | Ramos privados após defer público concluem o loading sem conteúdo visível, enviam follow-up efêmero e removem o original. Falha intermediária pode manter esse placeholder; o helper não expõe o erro privado nem repete envio ambíguo. |
+| Falha HTTP / resultado inesperado | Consultas têm prazo de 5 s, incluindo JSON do fetch; erros de consulta mantêm mensagens/visibilidade e falhas de envio são separadas. `/github` ainda mapeia não 200 para inexistente; `/status` pode chamar 3xx/4xx/5xx de offline. Schemas/quota/backoff continuam limitados. |
 | `/status` recusa um site público | P1.1 recusa DNS misto, faixas especiais, mapped/tradução IPv6, credenciais e redirects; usa somente o primeiro IP aprovado. Limites de 5 s/1 MiB/16 KiB também podem recusar sites online. Erros são genéricos e a saída omite caminho/query; não solicitar dumps com segredos como diagnóstico. |
 | Falha no QR code | cwd precisa permitir escrita; PNG temporário pode permanecer se envio falhar. Inspecionar arquivos sem apagá-los nesta auditoria. |
 | Anexos/reação não enviados | Conferir permissões e presença de `images/lofiradio.jpeg` e `images/lofiicon.png`. |
 | Lista/timer desapareceu ou mudou em outro servidor | Estado por userId é compartilhado entre servidores do mesmo processo e volátil. Não há backup restaurável dessas estruturas. |
 
-Logs de erros axios podem conter URLs e texto de consultas; compartilhe somente trechos sanitizados. Veja [riscos](KNOWN_RISKS.md).
+P1.2 usa logs fixos para falhas de interação/secundárias e não imprime erros HTTP brutos. Logs de ready ainda incluem servidores e o registro remoto tem tratamento próprio; acesso/retenção continuam pendentes. Compartilhe somente trechos sanitizados. Veja [riscos](KNOWN_RISKS.md).
 
 ## Preparação para futura hospedagem
 
 Não foi identificado provedor atual ou configuração de Docker, PM2, systemd, CI/CD ou serviço gerenciado. **Não há deploy aprovado ou realizado.** Como proposta técnica: um processo Node persistente com saída HTTPS/WebSocket para Discord/APIs, cwd na raiz, dependências completas, assets presentes, segredo injetado, espaço temporário gravável para QR codes e logs com retenção/acesso definidos.
 
-Runtime LTS, instalações limpas normal/produção e contratos offline foram validados em P0 e P1.1; R06 foi corrigido localmente com testes controlados. Antes de publicar, permanecem os riscos de prazo das interações e erros assíncronos, além da validação operacional em ambiente autorizado. Rede e roteamento da hospedagem são `NOT_CONFIRMED`. Um supervisor com reinício controlado e procedimento de rollback são propostas; não estão implementados. Múltiplas réplicas/shards exigem decidir como sincronizar estado e contagens; a versão atual é um único cliente/processo com memória local.
+Runtime LTS, instalações limpas normal/produção e contratos offline foram validados em P0/P1.1; R06 foi corrigido localmente e P1.2 corrigiu R05/R07 nos testes controlados. Antes de publicar, permanecem os riscos de configuração/ciclo de vida, limites/estado e recuperação, além da validação operacional autorizada. Rede e roteamento da hospedagem são `NOT_CONFIRMED`. Supervisor e rollback são propostas; não estão implementados. Múltiplas réplicas/shards exigem decidir sincronização de estado/contagens; a versão atual é um único cliente/processo com memória local.
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P0 já está commitado e as alterações P1.1 ainda estão sem commit.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P1.1 já está commitada e as alterações P1.2 ainda estão sem commit.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.

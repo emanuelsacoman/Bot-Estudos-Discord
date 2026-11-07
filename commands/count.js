@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond } = require("../lib/interactions");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -24,6 +25,6 @@ module.exports = {
             .setFooter({ text: "CodeBucket", iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png" })
             .setTimestamp();
 
-        await interaction.reply({ embeds: [countEmbed] });
+        await respond(interaction, { embeds: [countEmbed] });
     }
 }

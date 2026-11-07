@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond, runSecondary } = require("../lib/interactions");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -13,7 +14,7 @@ module.exports = {
             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
             .setTimestamp();
 
-        await interaction.reply({
+        await respond(interaction, {
             embeds: [exampleEmbed],
             components: [],
         });
@@ -21,8 +22,8 @@ module.exports = {
         const emojis = ['🎵', '📚', '🎧', '🎶', '📖', '🎓', '📝', '🔬', '📌', '💡', '🖊️', '✏️', '📏', '🖇️', '💙'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
 
-        const followUpMessage = await interaction.followUp({ content: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=3fb6ffe4339d462e" });
+        const followUpMessage = await respond(interaction, { content: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=3fb6ffe4339d462e" });
 
-        await followUpMessage.react(randomEmoji); 
+        await runSecondary(() => followUpMessage.react(randomEmoji));
     }
 };

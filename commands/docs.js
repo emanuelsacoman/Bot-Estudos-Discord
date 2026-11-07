@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, Component, EmbedBuilder } = require("discord.js")
+const { respond } = require("../lib/interactions");
 
 const row = new ActionRowBuilder()
     .addComponents(
@@ -147,6 +148,6 @@ module.exports = {
             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
             .setTimestamp();
 
-            await interaction.reply({embeds: [exampleEmbed], components: [row] });
+            await respond(interaction, {embeds: [exampleEmbed], components: [row] });
     }
 }

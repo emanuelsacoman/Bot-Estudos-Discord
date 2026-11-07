@@ -1,4 +1,5 @@
 const { Client, Events, GatewayIntentBits, Collection, Activity, ActivityType } = require('discord.js')
+const { respond, runWithErrorHandling } = require('./lib/interactions');
 
 const cooldowns = new Collection();
 
@@ -208,25 +209,13 @@ const docsCommand = require('./commands/docs');
 client.commands.set(docsCommand.data.name, docsCommand);
 
 // Listener de interações com o bot
-client.on(Events.InteractionCreate, async interaction => {
-    try {
+client.on(Events.InteractionCreate, interaction =>
+    runWithErrorHandling(interaction, async () => {
         if (interaction.isStringSelectMenu()) {
             const selected = interaction.values[0];
             const selectedOption = selectedOptions[selected];
 
-            if (selectedOption) {
-                try {
-                    await interaction.reply(selectedOption);
-                } catch (error) {
-                    console.error("Erro ao responder/atualizar a interação:", error);
-                }
-            } else {
-                try {
-                    await interaction.reply("Opção não reconhecida.");
-                } catch (error) {
-                    console.error("Erro ao responder/atualizar a interação:", error);
-                }
-            }
+            await respond(interaction, selectedOption || "Opção não reconhecida.");
         } else if (interaction.isCommand()) {
             const command = client.commands.get(interaction.commandName);
             if (!command) {
@@ -248,14 +237,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
                 if (now < expirationTime) {
                     const timeLeft = (expirationTime - now) / 1000;
-                    try {
-                        await interaction.reply({
-                            content: `:anger: Por favor, espere **${timeLeft.toFixed(1)}** segundos antes de usar o comando novamente.`,
-                            ephemeral: true
-                        });
-                    } catch (error) {
-                        console.error("Erro ao responder/atualizar a interação:", error);
-                    }
+                    await respond(interaction, {
+                        content: `:anger: Por favor, espere **${timeLeft.toFixed(1)}** segundos antes de usar o comando novamente.`,
+                        ephemeral: true
+                    });
                     return;
                 }
             }
@@ -263,18 +248,7 @@ client.on(Events.InteractionCreate, async interaction => {
             timestamps.set(interaction.user.id, now);
             setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
-            try {
-                await command.execute(interaction);
-            } catch (error) {
-                console.error(error);
-                try {
-                    await interaction.reply("Houve um erro ao executar esse comando!");
-                } catch (error) {
-                    console.error("Erro ao responder à interação de erro:", error);
-                }
-            }
+            await command.execute(interaction);
         }
-    } catch (error) {
-        console.error("Erro geral na interação:", error);
-    }
-});
+    })
+);

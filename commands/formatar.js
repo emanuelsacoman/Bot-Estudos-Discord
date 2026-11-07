@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { deferResponse, respond } = require("../lib/interactions");
 const prettier = require("prettier");
 
 module.exports = {
@@ -29,6 +30,8 @@ module.exports = {
     const linguagem = interaction.options.getString("linguagem");
     const codigo = interaction.options.getString("codigo");
 
+    await deferResponse(interaction);
+    let payload;
     try {
       const options = {
         parser: linguagem,
@@ -46,13 +49,13 @@ module.exports = {
         .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      console.error(error);
-      await interaction.reply({
+      payload = { embeds: [embed] };
+    } catch {
+      payload = {
         content: "Ocorreu um erro ao formatar o código. Verifique se a sintaxe está correta.",
         ephemeral: true
-      });
+      };
     }
+    await respond(interaction, payload);
   }
 };

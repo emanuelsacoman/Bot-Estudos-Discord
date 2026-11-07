@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { deferResponse, respond, runSecondary } = require("../lib/interactions");
 const qrcode = require("qrcode");
 const fs = require("fs");
 
@@ -15,6 +16,7 @@ module.exports = {
         const link = interaction.options.getString("link");
         const qrCodeFileName = `qrcode_${Date.now()}.png`;
 
+        await deferResponse(interaction);
         await generateQRCode(link, qrCodeFileName);
 
         const qrCodeEmbed = new EmbedBuilder()
@@ -25,16 +27,12 @@ module.exports = {
             .setFooter({ text: "CodeBucket", iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png" })
             .setTimestamp();
 
-        await interaction.reply({ embeds: [qrCodeEmbed], files: [qrCodeFileName] });
+        await respond(interaction, { embeds: [qrCodeEmbed], files: [qrCodeFileName] });
 
-        fs.unlinkSync(qrCodeFileName);
+        await runSecondary(() => fs.unlinkSync(qrCodeFileName));
     },
 };
 
 async function generateQRCode(link, fileName) {
-    try {
-        await qrcode.toFile(fileName, link);
-    } catch (error) {
-        console.error("Erro ao gerar o QR code:", error);
-    }
+    await qrcode.toFile(fileName, link);
 }

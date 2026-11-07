@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { respond, runSecondary } = require("../lib/interactions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,12 +23,12 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(voteButton);
 
-    const message = await interaction.reply({
+    const message = await respond(interaction, {
       embeds: [exampleEmbed],
       components: [row],
       fetchReply: true
     });
 
-    await message.react('⭐');
+    await runSecondary(() => message.react('⭐'));
   }
 };

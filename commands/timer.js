@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond, runSecondary } = require("../lib/interactions");
 
 let timers = {};
 
@@ -51,13 +52,13 @@ module.exports = {
                     delete timers[interaction.user.id];
                 }
 
-                timers[interaction.user.id] = setTimeout(() => {
+                timers[interaction.user.id] = setTimeout(() => runSecondary(async () => {
                     const channel = interaction.channel;
-                    channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
-                }, tempoEmMilissegundos);
+                    await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embed2] });
+                }), tempoEmMilissegundos);
 
 
-                await interaction.reply({ content: `<@${interaction.user.id}>`, embeds: [embed1] });
+                await respond(interaction, { content: `<@${interaction.user.id}>`, embeds: [embed1] });
             } else if (subcommand === "stop") {
                 if (timers[interaction.user.id]) {
                     clearTimeout(timers[interaction.user.id]);
@@ -68,13 +69,13 @@ module.exports = {
                             .setDescription(`<@${interaction.user.id}> finalizou seu próprio temporizador.`)
                             .setFooter({ text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png' })
                             .setTimestamp();
-                    await interaction.reply({ embeds: [exampleEmbed] });
+                    await respond(interaction, { embeds: [exampleEmbed] });
                 } else {
-                    await interaction.reply({ content: "Não há temporizador em execução para você.", ephemeral: true});
+                    await respond(interaction, { content: "Não há temporizador em execução para você.", ephemeral: true});
                 }
             }
         } catch (error) {
-            console.error(error);
+            throw error;
         }
     }
 };
