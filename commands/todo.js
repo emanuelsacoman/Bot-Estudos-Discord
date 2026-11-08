@@ -3,8 +3,6 @@ const { respond } = require("../lib/interactions");
 const { embedPayload, validText } = require("../lib/content-limits");
 const {
   TODO_LIMITS,
-  DUPLICATE_PREFIX,
-  DUPLICATE_SUFFIX,
   TodoStoreError,
   createTodoStore,
 } = require("../lib/todo-store");
@@ -58,13 +56,23 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const userId = interaction.user.id;
-    const subcommand = interaction.options.getSubcommand();
     let payload;
-    let task;
     try {
+      const context = {
+        userId: interaction.user?.id,
+        guildId: interaction.guildId,
+      };
+      // Missing/invalid guild context must never fall back to a user's DM list.
+      if (
+        typeof interaction.inGuild === "function" &&
+        interaction.inGuild() !== (context.guildId !== null)
+      ) {
+        throw new TodoStoreError("INVALID_CONTEXT");
+      }
+      const tasks = userToDoLists.list(context);
+      const subcommand = interaction.options.getSubcommand();
       if (subcommand === "add") {
-        task = interaction.options.getString("tarefa");
+        const task = interaction.options.getString("tarefa");
         // Prepare the complete response before changing local state.
         // The store validates even when the command is invoked directly.
         if (!validText(task, TODO_LIMITS.taskLength)) {
@@ -74,9 +82,8 @@ module.exports = {
           `Tarefa **${task}** adicionada à sua lista.`,
           0x00e903,
         );
-        userToDoLists.add(userId, task);
+        userToDoLists.add(context, task);
       } else if (subcommand === "list") {
-        const tasks = userToDoLists.list(userId);
         payload =
           tasks.length === 0
             ? { content: "Sua lista de tarefas está vazia.", ephemeral: true }
@@ -86,7 +93,6 @@ module.exports = {
               );
       } else if (subcommand === "remove") {
         const number = interaction.options.getInteger("numero");
-        const tasks = userToDoLists.list(userId);
         if (
           !Number.isSafeInteger(number) ||
           number < 1 ||
@@ -98,20 +104,18 @@ module.exports = {
           `Tarefa **${tasks[number - 1]}** removida da sua lista.`,
           0xff090d,
         );
-        userToDoLists.remove(userId, number);
+        userToDoLists.remove(context, number);
       } else {
         throw new TodoStoreError("INVALID_SUBCOMMAND");
       }
     } catch (error) {
-      if (!(error instanceof TodoStoreError)) throw error;
       const messages = {
+        INVALID_CONTEXT:
+          "Não foi possível identificar o contexto da sua lista de tarefas.",
         INVALID_TASK: `Informe uma tarefa não vazia, com Unicode válido e até ${TODO_LIMITS.taskLength} caracteres.`,
-        DUPLICATE:
-          error.code === "DUPLICATE"
-            ? `${DUPLICATE_PREFIX}${task}${DUPLICATE_SUFFIX}`
-            : undefined,
-        USER_TASKS: `Sua lista atingiu o limite de ${TODO_LIMITS.tasksPerUser} tarefas. Remova uma tarefa antes de adicionar outra.`,
-        USER_BYTES: `Sua lista atingiu o orçamento de ${TODO_LIMITS.bytesPerUser / 1024} KiB de texto. Remova tarefas antes de adicionar outra.`,
+        DUPLICATE: "Essa tarefa já está na sua lista neste contexto.",
+        USER_TASKS: `Você atingiu o limite de ${TODO_LIMITS.tasksPerUser} tarefas somadas entre servidores e DM. Remova uma tarefa antes de adicionar outra.`,
+        USER_BYTES: `Você atingiu o orçamento de ${TODO_LIMITS.bytesPerUser / 1024} KiB de texto somados entre servidores e DM. Remova tarefas antes de adicionar outra.`,
         CAPACITY:
           "A capacidade de tarefas deste processo foi atingida. Remova tarefas existentes ou tente novamente mais tarde.",
         INVALID_NUMBER:
@@ -119,10 +123,18 @@ module.exports = {
         INVALID_SUBCOMMAND:
           "Selecione uma operação válida da lista de tarefas.",
       };
-      payload = { content: messages[error.code], ephemeral: true };
+      // Never echo tasks, raw exceptions or context identifiers in an error.
+      // This includes preparation failures before the first acknowledgement.
+      payload = {
+        content:
+          (error instanceof TodoStoreError &&
+            Object.hasOwn(messages, error.code) &&
+            messages[error.code]) ||
+          "Não foi possível concluir a operação da lista de tarefas. Tente novamente.",
+      };
     }
     // A failed delivery has an ambiguous remote outcome. Preserve the
     // existing local effect and let the interaction helper prevent retries.
-    await respond(interaction, payload);
+    await respond(interaction, { ...payload, ephemeral: true });
   },
 };

@@ -1,6 +1,6 @@
 # Estado atual do projeto
 
-Atualizado na **P2.1, 2026-11-07**, America/Sao_Paulo. Base da tarefa: **develop / e23374279da78591219adf15547eadb10bfe3a24** (`P1.3 concluída`), árvore inicialmente limpa. P1.3 já commitada; mudanças P2.1 sem commit/push. Não houve fetch/merge/operação remota e o estado remoto não foi consultado. Os resultados anteriores abaixo são registros históricos.
+Atualizado na **P2.2, 2026-11-07**, America/Sao_Paulo. Base da tarefa: **develop/cf65c1411c422b57d083aaffa659627b0d5ba5bb**, árvore inicialmente limpa. P2.1 já commitada; mudanças P2.2 sem commit/push. Não houve fetch/merge/operação remota e o estado remoto não foi consultado. Os resultados anteriores abaixo são registros históricos.
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
 
@@ -33,9 +33,11 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 | `DONE` | P1.3: baseline **308/308**, suíte final **537/537**, sintaxe **46/46** e contratos **23/23** aprovados em Node 24.22.2/npm 11.19.1. Catálogo real e quatro casos do CLI foram exercitados offline sob guardas, sem credenciais/.env/rede. Demais inicializações/login/REST e relógios são simulados. Manifest/lock/dependências e helpers P1.1/P1.2 permanecem iguais à base. |
 | `DONE` | P2.1: QR PNG em Buffer independente de cwd, sem arquivos temporários; validações e anexos completos para limites de conteúdo, HTTP até 1 MiB antes do parse e todo com budgets de texto/cardinalidade. R10/R11 `RESOLVED` localmente; [comandos](COMMANDS.md) e [qualidade](QUALITY_GATES.md). |
 | `DONE` | P2.1: baseline sequencial 537/537, suíte final **739/739**, sintaxe **52/52**, 23 contratos/hash público preservados. Node 24.22.2/npm 11.19.1; nenhuma dependência/manifest/lock alterados, instalação existente usada. Helpers anteriores preservados, com ampliação limitada de HTTP. |
-| `IN_PROGRESS` | Nenhuma implementação adicional em andamento ao fechar P2.1 offline. |
+| `DONE` | P2.2: `/todo` isolado por servidor+usuário e DM+usuário, com todas as respostas/anexos efêmeros, erros sem tarefas e cotas agregadas por usuário; [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md). R09 é `MITIGATED`, pois reiniciar ainda apaga tarefas, sem sincronização/recuperação/persistência. |
+| `DONE` | P2.2: baseline **739/739**, suíte final **765/765**, sintaxe **53/53** e contratos **23/23** aprovados em Node 24.22.2/npm 11.19.1, com hash público preservado. 26 casos adicionados e 16 anteriores de todo adaptados para privacidade/contexto; detalhes em [qualidade](QUALITY_GATES.md). Sem dependências novas, login, registro remoto ou reinício de bot real. |
+| `IN_PROGRESS` | Nenhuma implementação adicional em andamento ao fechar P2.2 offline. |
 | `MISSING` | Cobertura funcional integral de handlers/integrações. R15 está `MITIGATED` pela suíte ampliada; não há script `start`, CI ou hospedagem versionada. |
-| `MISSING` | Persistência de `/todo`, `/timer` e cooldowns, decisão de escopo/privacidade de todo, controle integral de contratos/quota externos e recuperação operacional. P2.1 removeu arquivos QR e validou os campos consumidos/limites; nenhuma implementação adicional autorizada por esta lista. |
+| `MISSING` | Persistência de `/todo`, `/timer` e cooldowns, sincronização entre processos, recuperação após falha de hospedagem e requisitos de retenção/recuperação de todo; controle integral de contratos/quota externos. Escopo/privacidade de todo foram definidos na P2.2, sem autorizar banco/infra ou reinício. |
 | `BLOCKED` | Shim NVM global sem padrão instalado correspondente à `.nvmrc`; somente Node 20 está no gerenciador, com `auto_install=false`. Uso do runtime portátil explícito resolveu os testes locais sem alterar o padrão global; o shim não foi reparado globalmente. |
 | `NOT_CONFIRMED` | Login real, validade do token, correspondência TOKEN/CLIENT_ID, comandos registrados remotamente, permissões, disponibilidade de APIs/links, hospedagem, uptime e recuperação prática. |
 
@@ -53,6 +55,8 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 `@discordjs/builders` `1.10.1` é transitivo e importado diretamente por `/translate`; `node-fetch` permanece sem importação encontrada. Ambos foram preservados, para evitar mudanças desnecessárias nesta fase. `/github` usa `fetch` global. O mínimo legado das dependências é Node **18.17**, via `undici` `6.21.1`; a política atual do projeto é Node **24.x**, com patch **24.22.2** validado. Veja justificativa e instalação em [operações](OPERATIONS.md).
 
 ## Métodos e limites
+
+P2.2 conserva o armazenamento em memória, sem persistência externa: reiniciar apaga as tarefas, processos não sincronizam estado e falha de hospedagem não tem recuperação implementada. As cotas de 100 tarefas e 64 KiB são somadas por usuário entre todos os servidores/DM, com 8 MiB e 1024 usuários distintos por processo; não se ampliam pela criação de novos contextos. Não há expulsão silenciosa nem migração automática de listas globais antigas. A tarefa não acessou estado real nem reiniciou o bot. Persistência futura exige decisão arquitetural própria; [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md) registra a decisão de escopo/privacidade e a transição operacional limitada.
 
 Na auditoria inicial foi usado Node **v20.20.0**, sem instalação. Na Fase 1 foi baixado o runtime oficial **v24.22.2**, com npm **11.19.1**, para área local ignorada. Duas instalações npm independentes baixaram somente o grafo travado no lock, sem cache antigo ou `.env`. Foram comparados os 85 pacotes do lock anterior/atual para garantir ausência de atualizações e os payloads dos comandos para preservar seus contratos públicos.
 

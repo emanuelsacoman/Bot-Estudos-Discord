@@ -12,6 +12,8 @@ const {
 } = require("../lib/todo-store");
 const { DISCORD_LIMITS } = require("../lib/content-limits");
 
+const context = (userId, guildId = "guild-1") => ({ userId, guildId });
+
 function isStoreError(code) {
   return (error) => error instanceof TodoStoreError && error.code === code;
 }
@@ -58,7 +60,7 @@ async function run(command, subcommand, task, number) {
   return current.events[0];
 }
 
-test("todo: limites locais são explícitos e duplicata cabe exatamente na mensagem", () => {
+test("todo: teto de tarefa e budgets da P2.1 permanecem preservados", () => {
   assert.equal(
     TODO_LIMITS.taskLength + DUPLICATE_PREFIX.length + DUPLICATE_SUFFIX.length,
     DISCORD_LIMITS.content,
@@ -71,7 +73,7 @@ test("todo: limites locais são explícitos e duplicata cabe exatamente na mensa
 
 test("todo store: leitura vazia e entradas inválidas não alocam listas", () => {
   const store = createTodoStore();
-  assert.deepEqual(store.list("missing"), []);
+  assert.deepEqual(store.list(context("missing")), []);
   for (const task of [
     undefined,
     null,
@@ -82,12 +84,15 @@ test("todo store: leitura vazia e entradas inválidas não alocam listas", () =>
     "\ud800",
     "x".repeat(TODO_LIMITS.taskLength + 1),
   ]) {
-    assert.throws(() => store.add("user", task), isStoreError("INVALID_TASK"));
+    assert.throws(
+      () => store.add(context("user"), task),
+      isStoreError("INVALID_TASK"),
+    );
   }
   for (const userId of [null, "", "u".repeat(21)]) {
     assert.throws(
-      () => store.add(userId, "valid task"),
-      isStoreError("INVALID_TASK"),
+      () => store.add(context(userId), "valid task"),
+      isStoreError("INVALID_CONTEXT"),
     );
   }
   assert.deepEqual(store.usage(), { users: 0, totalBytes: 0 });
@@ -98,9 +103,12 @@ test("todo store: tarefa no limite e emojis são preservados sem normalização"
   const task =
     "😀".repeat(Math.floor(TODO_LIMITS.taskLength / 2)) +
     "a".repeat(TODO_LIMITS.taskLength % 2);
-  store.add("user", task);
-  assert.deepEqual(store.list("user"), [task]);
-  assert.throws(() => store.add("user", task), isStoreError("DUPLICATE"));
+  store.add(context("user"), task);
+  assert.deepEqual(store.list(context("user")), [task]);
+  assert.throws(
+    () => store.add(context("user"), task),
+    isStoreError("DUPLICATE"),
+  );
   assert.deepEqual(store.usage(), {
     users: 1,
     totalBytes: Buffer.byteLength(task),
@@ -110,49 +118,61 @@ test("todo store: tarefa no limite e emojis são preservados sem normalização"
 test("todo store: número máximo de itens aceita limite e recusa excesso sem mutação", () => {
   const store = createTodoStore();
   for (let i = 0; i < TODO_LIMITS.tasksPerUser; i += 1)
-    store.add("user", `task-${i}`);
+    store.add(context("user"), `task-${i}`);
   const before = store.usage();
-  assert.throws(() => store.add("user", "extra"), isStoreError("USER_TASKS"));
-  assert.equal(store.list("user").length, TODO_LIMITS.tasksPerUser);
+  assert.throws(
+    () => store.add(context("user"), "extra"),
+    isStoreError("USER_TASKS"),
+  );
+  assert.equal(store.list(context("user")).length, TODO_LIMITS.tasksPerUser);
   assert.deepEqual(store.usage(), before);
 });
 
 test("todo store: orçamento por usuário conta bytes UTF-8 e permite liberar espaço", () => {
   const store = createTodoStore({ bytesPerUser: 8 });
-  store.add("user", "😀😀");
-  assert.throws(() => store.add("user", "x"), isStoreError("USER_BYTES"));
-  assert.equal(store.remove("user", 1), "😀😀");
+  store.add(context("user"), "😀😀");
+  assert.throws(
+    () => store.add(context("user"), "x"),
+    isStoreError("USER_BYTES"),
+  );
+  assert.equal(store.remove(context("user"), 1), "😀😀");
   assert.deepEqual(store.usage(), { users: 0, totalBytes: 0 });
-  store.add("user", "12345678");
+  store.add(context("user"), "12345678");
   assert.equal(store.usage().totalBytes, 8);
 });
 
 test("todo store: orçamento global aceita exato e rejeita sem expulsar listas", () => {
   const store = createTodoStore({ totalBytes: 8 });
-  store.add("one", "1234");
-  store.add("two", "5678");
-  assert.throws(() => store.add("three", "x"), isStoreError("CAPACITY"));
-  assert.deepEqual(store.list("one"), ["1234"]);
-  assert.deepEqual(store.list("two"), ["5678"]);
+  store.add(context("one"), "1234");
+  store.add(context("two"), "5678");
+  assert.throws(
+    () => store.add(context("three"), "x"),
+    isStoreError("CAPACITY"),
+  );
+  assert.deepEqual(store.list(context("one")), ["1234"]);
+  assert.deepEqual(store.list(context("two")), ["5678"]);
   assert.deepEqual(store.usage(), { users: 2, totalBytes: 8 });
-  store.remove("one", 1);
-  store.add("three", "new");
+  store.remove(context("one"), 1);
+  store.add(context("three"), "new");
   assert.deepEqual(store.usage(), { users: 2, totalBytes: 7 });
 });
 
 test("todo store: teto de usuários controla metadados e exclusão final libera vaga", () => {
   const store = createTodoStore({ users: 2 });
-  store.add("one", "a");
-  store.add("two", "b");
-  assert.throws(() => store.add("three", "c"), isStoreError("CAPACITY"));
-  store.remove("two", 1);
-  store.add("three", "c");
+  store.add(context("one"), "a");
+  store.add(context("two"), "b");
+  assert.throws(
+    () => store.add(context("three"), "c"),
+    isStoreError("CAPACITY"),
+  );
+  store.remove(context("two"), 1);
+  store.add(context("three"), "c");
   assert.deepEqual(store.usage(), { users: 2, totalBytes: 2 });
 });
 
 test("todo store: remoção rejeita índices inválidos sem coerção nem mutação", () => {
   const store = createTodoStore();
-  store.add("user", "first");
+  store.add(context("user"), "first");
   for (const number of [
     null,
     undefined,
@@ -166,20 +186,23 @@ test("todo store: remoção rejeita índices inválidos sem coerção nem mutaç
     Number.MAX_SAFE_INTEGER + 1,
   ]) {
     assert.throws(
-      () => store.remove("user", number),
+      () => store.remove(context("user"), number),
       isStoreError("INVALID_NUMBER"),
     );
   }
-  assert.deepEqual(store.list("user"), ["first"]);
-  assert.equal(store.remove("user", 1), "first");
-  assert.throws(() => store.remove("user", 1), isStoreError("INVALID_NUMBER"));
+  assert.deepEqual(store.list(context("user")), ["first"]);
+  assert.equal(store.remove(context("user"), 1), "first");
+  assert.throws(
+    () => store.remove(context("user"), 1),
+    isStoreError("INVALID_NUMBER"),
+  );
 });
 
 test("todo store: cópia de leitura não altera estado ou cálculo dos bytes", () => {
   const store = createTodoStore();
-  store.add("user", "first");
-  store.list("user").push("outside");
-  assert.deepEqual(store.list("user"), ["first"]);
+  store.add(context("user"), "first");
+  store.list(context("user")).push("outside");
+  assert.deepEqual(store.list(context("user")), ["first"]);
   assert.equal(store.usage().totalBytes, 5);
 });
 
@@ -193,7 +216,11 @@ test("/todo: fluxo normal mantém mensagens, cores, lista e duplicata", async (t
   assert.equal(embed.description, `Tarefa **${task}** adicionada à sua lista.`);
   assert.equal(embed.footer.text, "CodeBucket");
   const duplicate = await run(command, "add", task);
-  assert.equal(duplicate.content, `A tarefa "${task}" já está na sua lista.`);
+  assert.equal(
+    duplicate.content,
+    "Essa tarefa já está na sua lista neste contexto.",
+  );
+  assert.ok(!duplicate.content.includes(task));
   assert.ok(duplicate.flags & 64);
   const listed = await run(command, "list");
   assert.equal(
@@ -230,14 +257,15 @@ test("/todo: entrada vazia, acima do limite e Unicode inválido são informativo
   );
 });
 
-test("/todo: tarefa máxima preserva confirmação e duplicata de 2000 caracteres", async (t) => {
+test("/todo: tarefa máxima preserva confirmação privada sem ecoar na duplicata", async (t) => {
   const command = freshCommand(t);
   const task = "x".repeat(TODO_LIMITS.taskLength);
   const added = await run(command, "add", task);
   assert.ok(added.embeds[0].toJSON().description.includes(task));
   const duplicate = await run(command, "add", task);
-  assert.equal(duplicate.content.length, DISCORD_LIMITS.content);
-  assert.ok(duplicate.content.includes(task));
+  assert.ok(duplicate.content.length <= DISCORD_LIMITS.content);
+  assert.ok(!duplicate.content.includes(task));
+  assert.ok(duplicate.flags & 64);
 });
 
 test("/todo: descrição com 4096 caracteres cabe e excesso vira anexo completo", async (t) => {
@@ -280,7 +308,7 @@ test("/todo: lista extensa rejeita novo item e preserva os cem anteriores", asyn
   assert.ok(!list.includes("extra"));
 });
 
-test("/todo: índice fracionário não remove item; escopo por usuário entre servidores preservado", async (t) => {
+test("/todo: índice fracionário não remove item; outro servidor não exibe a lista", async (t) => {
   const command = freshCommand(t);
   await run(command, "add", "existing");
   const invalid = await run(command, "remove", undefined, 1.5);
@@ -288,8 +316,14 @@ test("/todo: índice fracionário não remove item; escopo por usuário entre se
   const anotherGuild = interaction("list");
   anotherGuild.guildId = "guild-2";
   await command.execute(anotherGuild);
+  assert.equal(
+    anotherGuild.events[0].content,
+    "Sua lista de tarefas está vazia.",
+  );
   assert.ok(
-    anotherGuild.events[0].embeds[0].toJSON().description.includes("existing"),
+    (await run(command, "list")).embeds[0]
+      .toJSON()
+      .description.includes("existing"),
   );
 });
 
