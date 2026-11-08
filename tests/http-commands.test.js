@@ -8,6 +8,11 @@ const { beforeEach, test } = require("node:test");
 const tls = require("node:tls");
 
 beforeEach((t) => {
+  // These cases exercise ordering/visibility, not expiry (covered separately in
+  // interactions.test.js). Module loading or parallel CI scheduling must not
+  // age an otherwise immediate mocked acknowledgement beyond Discord's 3 s.
+  const now = Date.now();
+  t.mock.method(Date, "now", () => now);
   const blockNetwork = () => {
     throw new Error("Somente APIs e interações simuladas são permitidas.");
   };

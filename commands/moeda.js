@@ -27,8 +27,23 @@ module.exports = {
 
   async execute(interaction) {
     const valor = interaction.options.getNumber("valor");
-    const origem = interaction.options.getString("origem").toUpperCase();
-    const destino = interaction.options.getString("destino").toUpperCase();
+    const origemInput = interaction.options.getString("origem");
+    const destinoInput = interaction.options.getString("destino");
+    if (
+      typeof valor !== "number" ||
+      !Number.isFinite(valor) ||
+      ![origemInput, destinoInput].every(
+        (value) => typeof value === "string" && /^[a-z]{3}$/i.test(value),
+      )
+    ) {
+      return respond(interaction, {
+        content:
+          "Informe um valor finito e códigos de moeda com três letras (ex.: USD e EUR).",
+        ephemeral: true,
+      });
+    }
+    const origem = origemInput.toUpperCase();
+    const destino = destinoInput.toUpperCase();
 
     const url = `https://api.exchangerate-api.com/v4/latest/${origem}`;
     await deferResponse(interaction);
@@ -36,15 +51,36 @@ module.exports = {
 
     try {
       const response = await getJson(url);
-      const taxasDeCambio = response.data.rates;
-      const taxaDeCambio = taxasDeCambio[destino];
+      const taxasDeCambio = response.data?.rates;
+      if (
+        !taxasDeCambio ||
+        typeof taxasDeCambio !== "object" ||
+        Array.isArray(taxasDeCambio)
+      ) {
+        throw new TypeError("Tabela de taxas inválida.");
+      }
+      const taxaDeCambio = Object.hasOwn(taxasDeCambio, destino)
+        ? taxasDeCambio[destino]
+        : undefined;
 
-      if (!taxaDeCambio) {
+      if (
+        taxaDeCambio === undefined ||
+        taxaDeCambio === null ||
+        taxaDeCambio === 0
+      ) {
         payload = {
           content: "Código de moeda de destino inválido.",
           ephemeral: true,
         };
       } else {
+        if (
+          typeof taxaDeCambio !== "number" ||
+          !Number.isFinite(taxaDeCambio) ||
+          taxaDeCambio <= 0 ||
+          !Number.isFinite(valor * taxaDeCambio)
+        ) {
+          throw new TypeError("Taxa de câmbio inválida.");
+        }
         const valorConvertido = (valor * taxaDeCambio).toFixed(2);
 
         const embed = new EmbedBuilder()

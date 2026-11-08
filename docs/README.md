@@ -1,8 +1,8 @@
 # Cérebro do CodeBucket
 
-Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. O cérebro foi commitado na `develop` em `02e22dd408a12b857127ebb1a689a857b6dd8a58` (`Brain`); a base desta tarefa é `develop` / `a79f13a` (`P1.2` já commitada).
+Base de conhecimento mantida junto do código. Comece por [AGENTS.md](../AGENTS.md) e pelo [ponto de continuidade](brain/CURRENT.md). Auditoria inicial: **2026-11-07**, fuso America/Sao_Paulo, código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`. O cérebro foi commitado na `develop` em `02e22dd408a12b857127ebb1a689a857b6dd8a58` (`Brain`); a base da P2.1 é `develop` / `e233742` (`P1.3` já commitada).
 
-**P0:** ambiente e dependências de produção. **P1.1:** proteção SSRF. **P1.2:** estabilidade de interações e prazos HTTP. **P1.3:** ambiente/bootstrap validados, registro protegido por confirmação explícita e timers limitados/isolados; R04/R08/R13 corrigidos no escopo local. Consulte [QUALITY_GATES](brain/QUALITY_GATES.md) e [ADR 0001](brain/decisions/0001-isolamento-dos-timers.md). Alterações P1.3 sem commit. Login, registro e deploy reais continuam fora da validação.
+**P0:** ambiente e dependências de produção. **P1.1:** proteção SSRF. **P1.2:** estabilidade de interações e prazos HTTP. **P1.3:** ambiente/bootstrap validados, registro protegido por confirmação explícita e timers limitados/isolados; R04/R08/R13 corrigidos no escopo local. Consulte [QUALITY_GATES](brain/QUALITY_GATES.md) e [ADR 0001](brain/decisions/0001-isolamento-dos-timers.md). **P2.1:** R10/R11 corrigidos offline: QR PNG em Buffer, conteúdo extenso em anexo integral, budgets de todo e HTTP antes do parse. P1.3 já commitada em `e233742`; alterações P2.1 sem commit. Login, registro e deploy reais continuam fora da validação.
 
 | Documento | Quando consultar |
 | --- | --- |

@@ -8,7 +8,7 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 **Atualização P1.2 — 2026-11-07, base `develop` / `234f01b`:** todos os comandos passaram a usar a continuação compartilhada de respostas. Operações HTTP, formatação e geração/envio de arquivos têm reconhecimento prévio; nomes, opções, mensagens e visibilidade dos ramos existentes foram preservados. A P1.2 foi commitada em `a79f13a`.
 
-**Atualização P1.3 — 2026-11-07, base `develop` / `a79f13a`:** validação compartilhada do catálogo no runtime/registro e ciclo de vida de `/timer` com duração e escopo controlados. Os nomes e opções slash permanecem iguais; as mudanças P1.3 estão sem commit. Evidências e limites em [QUALITY_GATES](QUALITY_GATES.md).
+**Atualização P1.3 — 2026-11-07, base `develop` / `a79f13a`:** validação compartilhada do catálogo no runtime/registro e ciclo de vida de `/timer` com duração e escopo controlados. Os nomes e opções slash permanecem iguais; a P1.3 foi commitada em `e233742`. Evidências e limites em [QUALITY_GATES](QUALITY_GATES.md).
 
 - Todos os módulos exportam `data` e `execute(interaction)`. [command-catalog.js](../../lib/command-catalog.js) carrega e valida o mesmo conjunto para o [runtime](../../index.js) e o [registro global](../../deploy-commands.js): catálogo não vazio, contratos serializáveis, nomes/opções sem duplicatas e snapshot JSON válido. Falha bloqueia a preparação, sem aceitar catálogo parcial. Carregar ou serializar localmente não comprova registro remoto.
 - Todas as opções de entrada documentadas são **obrigatórias**. Somente `/formatar` define escolhas fechadas; os demais textos são livres. Não há `setMinValue`, `setMaxValue`, `setMinLength` ou `setMaxLength` nos builders atuais.
@@ -16,9 +16,27 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 - Respostas normais são públicas, exceto `/ping`. Respostas efêmeras específicas são indicadas abaixo; o bloqueio de cooldown também é efêmero.
 - [interactions.js](../../lib/interactions.js) usa `reply()` antes do reconhecimento, `editReply()` após defer ainda pendente e `followUp()` depois de uma resposta concluída. Os sete comandos HTTP deferem antes da consulta; `/question` sem pergunta e `/http` 1xx respondem imediatamente. `/formatar`, `/qrcode` e o envio de anexos de `/lofiradio` também deferem antes do trabalho demorado.
 - A privacidade do reconhecimento original é imutável. Quando um ramo efêmero sucede defer público, o helper edita o loading com U+200B neutro, envia o conteúdo privado em follow-up com flag 64 e remove o placeholder. Nenhum erro privado é colocado na resposta pública; uma falha nessa sequência interrompe novas tentativas e pode deixar o placeholder neutro.
-- Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros sem corpo, URL ou configuração remota.
-- O listener trata erros conforme o estado da interação, sem repetir envios que falharam ou já foram reportados. Expiração local (3 s sem reconhecimento ou 15 min para interação reconhecida, desde a criação) e códigos terminais impedem novo envio. O erro central inicial continua público; depois do reconhecimento herda a visibilidade estabelecida. Reações e exclusão do QR após sucesso usam `runSecondary`; o manager de timers captura seu próprio envio tardio depois de remover o estado. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
+- Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`, agora com corpo até 1 MiB antes do parse; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros sem corpo, URL ou configuração remota.
+- O listener trata erros conforme o estado da interação, sem repetir envios que falharam ou já foram reportados. Expiração local (3 s sem reconhecimento ou 15 min para interação reconhecida, desde a criação) e códigos terminais impedem novo envio. O erro central inicial continua público; depois do reconhecimento herda a visibilidade estabelecida. Reações usam `runSecondary`; QR agora usa somente Buffer sem exclusão; o manager de timers captura seu próprio envio tardio depois de remover o estado. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
 - Todos dependem de `discord.js`, diretamente ou pelo builder transitivo indicado em `/translate`. Permissões de acesso ao canal, envio, embeds, anexos e reações devem ser verificadas conforme o recurso usado. Os builders não impõem permissões administrativas ou restrição explícita a servidores.
+
+## Limites e mudanças P2.1
+
+Base `develop/e233742`, 2026-11-07. **Os 23 payloads slash permanecem idênticos**, inclusive nomes, opções e descrições; as regras abaixo são validações em execute. Entradas normais mantêm mensagens/visibilidade. Entradas vazias, tipos incorretos, Unicode malformado e excesso recebem rejeição informativa; não há corte silencioso. Anexos de texto são Buffers UTF-8 com dados completos, sem arquivos temporários.
+
+| Limite | Origem / comportamento |
+| --- | --- |
+| Mensagem 2000; título/nome de campo/autor 256; descrição 4096; valor de campo 1024; 25 campos; rodapé 2048; soma de embed 6000 | [Discord oficial](https://docs.discord.com/developers/resources/message#embed-object-embed-limits), conferido nos builders. Conta unidades UTF-16 conservadoramente, sem dividir pares surrogate/emojis. Campos e soma são verificados antes da construção do embed; resultado extenso vai integral para anexo. |
+| String geral até 6000 | Teto de [opção string Discord](https://docs.discord.com/developers/interactions/application-commands#application-command-object-application-command-option-structure), validado também em execução direta; regras mais específicas abaixo prevalecem. |
+| URLs recebidas de APIs até 2048 unidades UTF-16 | Política local conservadora para links/URLs de imagens exibidos nos embeds, alinhada ao orçamento de entrada de URL já usado por /status; não é limite universal de URL/Discord. Exige HTTP(S) sem credenciais; recusa excesso/tipo inesperado, sem truncar ou consultar a URL recebida. |
+| Corpo HTTP e anexo de texto até 1 MiB UTF-8 cada | Política local de recurso para respostas de metadados, consistente com budget já usado por /status. Axios conta após descompressão antes do parse; fetch lê fluxo contado/cancelável. Mantém prazo 5 s e erros sanitizados. Não é quota da API remota ou teto global de heap/concorrência. |
+| QR até 5596 unidades UTF-16; capacidade efetiva depende do modo/UTF-8 | Máximo numérico versão 40/M da biblioteca; encoder recusa capacidades menores dos outros modos sem gerar anexo inválido. PNG/correção M preservados, texto continua livre (não exige URL). Descrição extensa transfere conteúdo completo a texto anexo junto do PNG. |
+| Todo: 1967 por tarefa | Derivado de 2000 menos prefixo/sufixo da mensagem de duplicata; a confirmação e a tarefa completa continuam cabendo. |
+| Todo: 100 itens/usuário; 64 KiB de texto UTF-8/usuário; 8 MiB de texto UTF-8/processo; 1024 usuários com listas | Políticas locais independentes: 100 limita arrays/trabalho de enumeração; 64 KiB limita uma lista/texto de anexo; 8 MiB impede acúmulo de texto total; 1024 limita Map/metadados mesmo com tarefas mínimas. Não são limites Discord nem medição exata de heap (JS/overhead acrescentam memória). Ao atingir, recusa nova inserção com aviso; não expulsa dados. Remoção final libera entrada/bytes; leitura vazia não aloca. |
+
+Mudanças adicionais de segurança: idioma deve ter sintaxe de sigla/tag com hífens (ex.: pt-BR), repositório deve ter forma usuario/repositorio, códigos de moeda três letras, valor/taxas/produto finitos e código HTTP inteiro 100–599. Isso valida formato, sem comprovar suporte/existência remota. Parâmetros interpolados de busca/tradução são codificados. APIs com forma inesperada ou corpo acima do budget recebem os erros sanitizados existentes, sem publicar saída parcial. /translate passa a unir todos os segmentos, corrigindo a perda anterior. /github passa a exibir fallbacks para descrição/linguagem ausentes. R16 continua aberto quanto a contrato operacional/quota/dependência transitiva.
+
+A falha de envio não é reinterpretada como falha de API/formatação nem repetida. /todo prepara a resposta antes de mudar a memória; uma falha de confirmação mantém o efeito local, pois a entrega pode ter ocorrido. Privacidade e escopo global por usuário continuam os mesmos (R09). Permissão para anexos passa a ser necessária também nos fallbacks extensos; entrega real `NOT_CONFIRMED`. R04/R05/R06/R07/R08/R13 preservados.
 
 ## Inventário
 
@@ -64,7 +82,7 @@ Envia embed sobre Emanuel Vinícius Sacoman e a origem do CodeBucket no TCC de A
 
 Responde embed com palavras (`trim`, separação por espaços e filtro), letras ASCII (`[a-zA-Z]`), dígitos (`\d`), grupo “Letras e Números” (`\w`) e `text.length`. Não usa serviço externo.
 
-**Erros e limites:** letras acentuadas não entram na contagem de letras; `_` entra no grupo de letras/números; o total de caracteres segue unidades UTF-16 do JavaScript. Não há catch local nem definição própria de contagem Unicode.
+**Erros e limites:** rejeita texto vazio/inválido/acima de 6000 antes da contagem. Letras acentuadas não entram na contagem de letras; `_` entra no grupo de letras/números; o total de caracteres segue unidades UTF-16 do JavaScript. Não há catch local nem definição própria de contagem Unicode.
 
 ### `/docs`
 
@@ -80,7 +98,7 @@ O handler global usa o primeiro valor selecionado para responder publicamente co
 
 **Fonte:** [exercise.js](../../commands/exercise.js). **Opções:** `linguagem` — string obrigatória, sem escolhas fechadas.
 
-Converte a entrada para minúsculas e sorteia um enunciado no banco local. Aliases aceitos:
+P2.1 valida linguagem não vazia/Unicode bem formado até 6000; resultado cujo título ultrapassa 256 segue em exercicio.txt integral. Converte a entrada para minúsculas e sorteia um enunciado no banco local. Aliases aceitos:
 
 | Banco | Entradas aceitas |
 | --- | --- |
@@ -106,7 +124,7 @@ Reconhece a interação com defer público antes de `await prettier.format(codig
 
 **Dependência e histórico:** Prettier `3.5.3` é dependência de produção (`^3.5.3`), pois é importado durante o carregamento de todos os comandos. Na auditoria inicial estava em `devDependencies`; a Fase 1 corrigiu essa classificação ([R02](KNOWN_RISKS.md#r02)), preservando faixa e versão resolvida. Instalação limpa com `--omit=dev` e carregamento dos comandos passaram em Node `24.22.2`/npm `11.19.1`. O `execute` real de `/formatar` passou nos cinco parsers (`babel`, `html`, `css`, `json`, `markdown`) usando resposta simulada, em ambos os modos de instalação, sem chamadas de rede. Envio real no Discord continua `NOT_CONFIRMED`; consulte [QUALITY_GATES.md](QUALITY_GATES.md).
 
-**Erros e limites:** não divide saídas grandes para os limites de campos/embeds do Discord. Falha de formatação/construção do embed mantém erro efêmero sugerindo conferir a sintaxe, inclusive quando a causa é outra. O envio fica fora desse catch; falha de envio não é confundida com erro de sintaxe nem provoca retry. A semântica de formatação foi preservada em P1.2.
+**Erros e limites:** P2.1 valida código não vazio até 6000 e parser entre as cinco choices. Campo de até 1024 inclui cercas/linguagem; saída maior ou contendo cercas Markdown é anexada integralmente como codigo-formatado com extensão apropriada. Não executa código. Falhas do Prettier mantêm erro efêmero de sintaxe; saída inválida/acima de 1 MiB recebe aviso específico para reduzir o código. Envio fora do catch impede retry/confusão com erro de sintaxe. Anexo tem budget local de 1 MiB.
 
 ### `/git`
 
@@ -118,11 +136,9 @@ Retorna embed estático com referências a `init`, `clone`, `stash`, `status`, `
 
 ### `/github`
 
-**Fonte:** [github.js](../../commands/github.js). **Opções:** `repositorio` — string obrigatória; formato esperado na descrição: `usuario/repositorio`.
+**Fonte:** [github.js](../../commands/github.js). **Opção:** `repositorio` string obrigatória no formato usuario/repositorio, até 6000, sem espaços/query/caminho adicional.
 
-Defer público antes de `fetchJson` em `https://api.github.com/repos/${repository}`; o helper usa `fetch` global com prazo total de 5000 ms para requisição e leitura do JSON. Para HTTP 200 exibe proprietário/avatar, nome completo, descrição, linguagem, estrelas, forks e URL em embed. Qualquer outro status recebe “Repositório não encontrado.” Todos esses ramos continuam públicos.
-
-**Erros e limites:** requer runtime com `fetch` global; não importa `node-fetch`. Não valida o formato nem autentica. Status de limite de API e falhas de autenticação podem ser confundidos com repositório ausente. Fallbacks após template strings não substituem `null`/`undefined`, que se tornam texto. Falhas HTTP, timeout ou corpo inesperado produzem mensagem pública genérica, sem log bruto; falha na continuação de envio não provoca nova resposta.
+Defer público antes de fetchJson na API GitHub, com 5 s e corpo até 1 MiB. HTTP 200 exige estrutura/tipos/URLs HTTP(S) válidos, contagens inteiras não negativas; exibe os mesmos dados em embed quando cabem. Descrição/linguagem opcionais ausentes têm fallback legível; dados extensos viram repositorio.txt completo. HTTP diferente de 200 continua “Repositório não encontrado.” Falha de consulta/corpo inesperado mantém erro público sanitizado; envio fora do catch, sem retry. Sem autenticação/rate-limit específico; formato local não prova existência remota.
 
 ### `/help`
 
@@ -130,15 +146,15 @@ Defer público antes de `fetchJson` em `https://api.github.com/repos/${repositor
 
 Lê `interaction.client.commands` e monta um campo de embed para cada nome/descrição carregado. Não faz consulta à lista registrada na API Discord.
 
-**Erros e limites:** não apresenta parâmetros nem subcomandos. São 23 campos no código atual; adicionar comandos pode exceder o limite de campos por embed. Não há catch local.
+**Erros e limites:** não apresenta parâmetros nem subcomandos. São 23 campos no catálogo atual; P2.1 envia comandos.txt integral se ultrapassar limites individuais/25 campos/6000 totais. Sem consulta ao catálogo remoto.
 
 ### `/http`
 
-**Fonte:** [http.js](../../commands/http.js). **Opções:** `codigo` — integer obrigatório, sem intervalo declarado.
+**Fonte:** [http.js](../../commands/http.js). **Opção:** `codigo` integer obrigatório, builder preservado; execute exige inteiro 100–599.
 
-Valores 100–199 recebem descrição genérica local de código informativo, sem defer nem HTTP. Os demais deferem publicamente e usam axios GET via `getJson` em `https://httpstat.us/${code}?json`, com prazo total de 5000 ms e aceitando qualquer status com `validateStatus: () => true`. Espera corpo com `code` e `description`; colore o embed conforme a faixa e inclui link em `httpstatuses.com`.
+1xx mantém resposta local imediata sem defer/HTTP. Demais valores deferem publicamente e usam getJson/axios em httpstat.us, prazo 5 s/corpo 1 MiB, validateStatus aceita qualquer status. Exige corpo com code inteiro 100–599 e description não vazia; código remoto pode diferir do solicitado, preservando o comportamento para respostas 4xx/5xx do serviço. Embed normal mantém cor/campos/link; descrição incluindo Markdown deve caber em 4096 e soma em 6000, caso contrário codigo-http.txt completo.
 
-**Erros e limites:** não restringe código a valores existentes. Corpo sem `data.code` recebe aviso efêmero; exceção/timeout gera erro efêmero, preservado mesmo após defer público. Falhas do envio são tratadas separadamente. O contrato atual do corpo remoto e a disponibilidade dos links são `NOT_CONFIRMED`.
+Entrada inválida e corpo/falhas inesperadas recebem avisos efêmeros sanitizados, inclusive após defer público. Sem retry de envio; disponibilidade/contrato remoto `NOT_CONFIRMED`.
 
 ### `/invite`
 
@@ -162,7 +178,7 @@ Usa `process.env.LOFIRADIO_URL` ou `https://lofiradio.web.app`, prepara embed co
 
 Converte códigos para maiúsculas, defere publicamente e usa axios GET via `getJson` em `https://api.exchangerate-api.com/v4/latest/${origem}`, com prazo total de 5000 ms. Busca `rates[destino]`, multiplica pelo valor e arredonda com `toFixed(2)`. Embed público mostra valor original, convertido e taxa.
 
-**Erros e limites:** não valida positividade nem faz trim. Destino sem taxa gera erro efêmero; HTTP 404 é interpretado como origem inválida; demais falhas/timeout recebem erro efêmero genérico. Esses ramos permanecem privados após defer público, e falha de envio não repete resposta. Atualização e precisão das taxas dependem do serviço externo, `NOT_CONFIRMED` nesta auditoria.
+**Erros e limites:** P2.1 exige valor numérico finito e códigos de três letras, sem trim; preserva valores finitos negativos/zero antes aceitos. Taxa deve ser número positivo finito e produto finito; corpos de forma incorreta são recusados. Destino sem taxa gera erro efêmero; HTTP 404 é interpretado como origem inválida; demais falhas/timeout recebem erro efêmero genérico. Esses ramos permanecem privados após defer público, e falha de envio não repete resposta. Atualização e precisão das taxas dependem do serviço externo, `NOT_CONFIRMED` nesta auditoria.
 
 ### `/ping`
 
@@ -182,11 +198,11 @@ Envia embed, um follow-up público com URL fixa da playlist Spotify `3FbsZmt8BrF
 
 ### `/qrcode`
 
-**Fonte:** [qrcode.js](../../commands/qrcode.js). **Opções:** `link` — string obrigatória.
+**Fonte:** [qrcode.js](../../commands/qrcode.js). **Opção:** `link` string obrigatória, preservada; continua aceitando texto livre, sem acessar o endereço.
 
-Defere publicamente antes de usar `qrcode.toFile()` para gerar `qrcode_${Date.now()}.png` no diretório de trabalho; envia como imagem anexa a um embed e tenta apagar o arquivo com `fs.unlinkSync()` depois da resposta. Usa `qrcode` e `fs`; não acessa o endereço codificado.
+P2.1 valida texto não vazio/Unicode bem formado até 5596 (máximo numérico versão 40/M), defere publicamente e gera PNG com qrcode.toBuffer, correção M padrão. Limites menores por modo/bytes são tratados pelo encoder com aviso privado pedindo reduzir o texto. Nome qrcode.png é local ao anexo de cada mensagem; Buffers independentes não compartilham caminho. Não há fs, diretório temporário, cwd ou cleanup. Descrição que exceda 4096 transfere o texto original completo para conteudo-qrcode.txt junto do PNG.
 
-**Erros e limites:** aceita texto arbitrário sem validar URL; requer escrita no diretório de execução. `Date.now()` permite colisões no mesmo milissegundo. Falha de geração agora propaga ao tratamento central e interrompe o envio do anexo ausente. A exclusão após sucesso é protegida por `runSecondary`, sem nova resposta em caso de falha. Não há `finally`: falha de geração/envio ou limpeza recusada ainda pode deixar arquivo no disco (R10 residual).
+Falha de geração recebe erro privado sanitizado após defer; falha de envio propaga ao helper, sem retry/novo arquivo. R10 resolvido localmente por testes de PNG real em memória, falhas/concorrência e guardas de filesystem; permissões/entrega reais `NOT_CONFIRMED`.
 
 ### `/question`
 
@@ -194,7 +210,7 @@ Defere publicamente antes de usar `qrcode.toFile()` para gerar `qrcode_${Date.no
 
 Defere publicamente antes de axios GET via `getJson` em `https://api.stackexchange.com/2.3/search`, com prazo total de 5000 ms, `order=desc`, `sort=activity`, `intitle` codificado e `site=stackoverflow`. Exibe título e link do **primeiro resultado por atividade**, sem buscar o conteúdo da resposta. Não há IA nem resposta automática à pergunta.
 
-**Erros e limites:** entrada vazia recebe resposta efêmera imediata, sem defer/HTTP; ausência de resultados e exceções/timeout também permanecem efêmeros após defer público. Não há controle de quota/backoff. Variável `answerLink` é calculada e não usada; o campo “Answer link” aponta para a própria pergunta. Idioma inglês é solicitado, sem validação ou tradução.
+**Erros e limites:** entrada vazia/inválida ou acima de 6000 recebe resposta efêmera imediata, sem defer/HTTP; título e link remotos são validados, resultado acima do limite de título/campo/soma vira pergunta.txt integral; ausência de resultados e exceções/timeout também permanecem efêmeros após defer público. Não há controle de quota/backoff. O campo “Answer link” aponta para a própria pergunta. Idioma inglês é solicitado, sem validação ou tradução.
 
 ### `/repositorys`
 
@@ -202,7 +218,7 @@ Defere publicamente antes de axios GET via `getJson` em `https://api.stackexchan
 
 Defere publicamente antes de axios GET via `getJson` em `https://api.github.com/search/repositories?q=language:${linguagem}&sort=stars&order=desc`, com prazo total de 5000 ms. Seleciona até cinco itens e envia texto público com nome completo, link e estrelas. Ausência de resultados recebe mensagem pública.
 
-**Erros e limites:** a entrada não é codificada na URL, permitindo caracteres que alteram a consulta. Não há autenticação nem tratamento específico de rate limit. Falha HTTP/timeout mantém erro público, sem log bruto. Não garante cinco resultados se houver menos.
+**Erros e limites:** P2.1 valida linguagem não vazia até 6000 e codifica a consulta. Exige items array; valida nome, URL HTTP(S) até 2048 e estrelas inteiras dos cinco itens exibidos. Texto acima de 2000 vira repositorios.txt completo, inclusive mensagem de ausência com linguagem extensa. Não há autenticação/rate limit específico. Falha HTTP/corpo inesperado mantém erro público sanitizado, sem retry de envio. Até cinco resultados é a seleção pública existente, não perda silenciosa de uma lista prometida integral.
 
 ### `/servercount`
 
@@ -234,19 +250,19 @@ Ao expirar, remove o agendamento **antes** de aguardar o envio ao canal. Uma ide
 
 ### `/todo`
 
-**Fonte:** [todo.js](../../commands/todo.js). **Subcomandos:** `add` com `tarefa` — string obrigatória; `list` sem opções; `remove` com `numero` — integer obrigatório, posição começando em 1.
+**Fonte:** [todo.js](../../commands/todo.js) e [todo-store.js](../../lib/todo-store.js). **Subcomandos preservados:** add tarefa string, list, remove numero integer (posição a partir de 1).
 
-Usa `Map<userId, array>` em memória. `add` bloqueia duplicata textual exata, acrescenta e confirma em embed; `list` enumera as tarefas; `remove` valida faixa, remove por índice e confirma. Duplicata, lista vazia e posição inválida geram mensagens efêmeras. Confirmações normais e lista são públicas.
+Estado em memória por usuário, compartilhado entre servidores. Add preserva duplicata textual exata e confirmação pública; entradas inválidas/capacidade/duplicata recebem aviso privado. Limites/budgets de admissão estão na tabela P2.1 acima, sem expulsão/expiração/persistência. Listagem até 4096 em embed; lista extensa vai integral para tarefas.txt, com ordem e números preservados. Remove exige inteiro seguro no intervalo; última remoção apaga a entrada e libera bytes. Listar usuário vazio não cria lista.
 
-**Erros e limites:** reinício perde todas as listas. A mesma lista do usuário é acessível em diferentes servidores, sem isolamento ou persistência. Não limita tarefas/tamanho nem divide embeds longos. Não há catch local. Inserção/remoção acontece antes de responder, podendo alterar a memória mesmo se o envio falhar.
+Resposta é preparada antes de inserir/remover; falha de entrega mantém o efeito local já aplicado, sem retry. Reinício perde todas as listas, escopo global/privacidade permanecem R09 e não foram alterados. Capacidade limita texto e cardinalidade, não um valor exato de heap.
 
 ### `/translate`
 
-**Fonte:** [translate.js](../../commands/translate.js). **Opções:** `idioma` — string obrigatória com sigla de destino; `texto` — string obrigatória.
+**Fonte:** [translate.js](../../commands/translate.js). **Opções preservadas:** idioma e texto strings obrigatórias.
 
-Importa `SlashCommandBuilder` de `@discordjs/builders` (dependência transitiva de discord.js). Defere publicamente e usa axios via `getJson` para consultar `https://translate.googleapis.com/translate_a/single`, com prazo total de 5000 ms, `client=gtx`, `sl=auto`, `tl=${idioma}`, `dt=t` e texto codificado em `q`. Extrai apenas `response.data[0][0][0]` e responde publicamente com menção ao usuário e tradução.
+Texto não vazio/Unicode bem formado até 6000; idioma com sintaxe de sigla/tag (ex.: pt, pt-BR), codificado junto do texto na URL. Defer público e getJson/axios para endpoint translate.googleapis.com/translate_a/single, prazo 5 s/corpo até 1 MiB. Valida array de segmentos e une todas as traduções textuais em ordem; mantém menção ao usuário. Até 2000 em mensagem, acima em traducao.txt completo (teto 1 MiB), sem cortar emojis/segmentos.
 
-**Erros e limites:** não valida idioma nem codifica a sigla e pressupõe formato específico do corpo. Pode descartar segmentos adicionais da tradução. Não existe chave/configuração de Google Cloud no projeto; contrato, estabilidade e uso permitido desse endpoint são `NOT_CONFIRMED`. Falha HTTP/timeout/corpo inesperado mantém erro efêmero, sem log bruto, mesmo após defer público. A importação depende da resolução de um pacote não declarado diretamente.
+Entrada inválida recebe aviso privado imediato; estrutura vazia/inesperada, falha HTTP/timeout recebe erro privado sanitizado, inclusive após defer público. Falha de envio fora do catch não provoca retry. Importação direta de @discordjs/builders continua transitiva; não há chave Google Cloud. Formato de idioma não prova suporte e contrato/estabilidade/termos do endpoint continuam `NOT_CONFIRMED` (R16).
 
 ### `/vote`
 

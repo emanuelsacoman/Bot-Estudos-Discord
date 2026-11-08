@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 const { respond } = require("../lib/interactions");
+const { validText, embedPayload } = require("../lib/content-limits");
 
 function gerarExercicio(linguagem) {
     const linguagens = {
@@ -451,17 +452,22 @@ module.exports = {
 
     async execute(interaction) {
         const linguagem = interaction.options.getString('linguagem');
+        if (!validText(linguagem)) {
+            return respond(interaction, {
+                content: "Informe uma linguagem não vazia de até 6000 caracteres.",
+                ephemeral: true,
+            });
+        }
         const exercicio = gerarExercicio(linguagem);
         
         const linguagemMaiuscula = linguagem.toUpperCase();
         
-        const exampleEmbed = new EmbedBuilder()
-            .setColor('#ff9c00')
-            .setTitle(`Exercício de ${linguagemMaiuscula}`)
-            .setDescription(`${exercicio}`)
-            .setFooter({text: 'CodeBucket', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190544.png'})
-            .setTimestamp();
-
-        await respond(interaction, { embeds: [exampleEmbed] });
+        await respond(interaction, embedPayload({
+            color: 0xff9c00,
+            title: `Exercício de ${linguagemMaiuscula}`,
+            description: exercicio,
+            footer: {text: 'CodeBucket', icon_url: 'https://cdn-icons-png.flaticon.com/512/190/190544.png'},
+            timestamp: new Date().toISOString(),
+        }, "exercicio.txt"));
     }
 };

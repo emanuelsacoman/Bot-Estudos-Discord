@@ -242,21 +242,20 @@ test("/formatar: falha do editReply não é confundida com erro de sintaxe", asy
   assert.deepEqual(methods(interaction), ["deferReply", "editReply"]);
 });
 
-test("/qrcode reconhece antes de gerar e captura falha no cleanup após sucesso", async (t) => {
+test("/qrcode reconhece antes de gerar Buffer sem cleanup de arquivo", async (t) => {
   guardNetwork(t);
   captureLogs(t);
   const interaction = interactionFor({
     strings: { link: "https://example.com" },
   });
   const generated = [];
-  t.mock.method(qrcode, "toFile", async (file, link) => {
+  t.mock.method(qrcode, "toBuffer", async (link) => {
     assert.deepEqual(methods(interaction), ["deferReply"]);
-    generated.push({ file, link });
+    generated.push({ link });
+    return Buffer.from("png-simulado");
   });
   t.mock.method(fs, "unlinkSync", (file) => {
-    assert.equal(file, generated[0].file);
-    assert.deepEqual(methods(interaction), ["deferReply", "editReply"]);
-    throw new Error("sentinela-erro-privado-cleanup");
+    assert.fail("QR em Buffer não remove arquivos");
   });
   await execute("qrcode", interaction);
   assert.equal(generated.length, 1);
@@ -268,7 +267,7 @@ test("/qrcode reconhece antes de gerar e captura falha no cleanup após sucesso"
 test("/qrcode: erro de geração interrompe envio do anexo ausente", async (t) => {
   guardNetwork(t);
   captureLogs(t);
-  t.mock.method(qrcode, "toFile", async () => {
+  t.mock.method(qrcode, "toBuffer", async () => {
     throw new Error("sentinela-erro-privado-qrcode");
   });
   let removed = 0;
@@ -326,7 +325,7 @@ for (const name of ["formatar", "qrcode", "lofiradio"]) {
     t.mock.method(prettier, "format", async () => {
       operations += 1;
     });
-    t.mock.method(qrcode, "toFile", async () => {
+    t.mock.method(qrcode, "toBuffer", async () => {
       operations += 1;
     });
     const interaction = interactionFor({
@@ -343,10 +342,10 @@ for (const name of ["formatar", "qrcode", "lofiradio"]) {
   });
 }
 
-test("/qrcode: falha do envio não repete resposta nem executa cleanup de sucesso", async (t) => {
+test("/qrcode: falha do envio não repete resposta nem acessa arquivos", async (t) => {
   guardNetwork(t);
   captureLogs(t);
-  t.mock.method(qrcode, "toFile", async () => {});
+  t.mock.method(qrcode, "toBuffer", async () => Buffer.from("png-simulado"));
   let removed = 0;
   t.mock.method(fs, "unlinkSync", () => {
     removed += 1;

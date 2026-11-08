@@ -1,6 +1,12 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
 const { getJson } = require("../lib/http-client");
+const {
+  validText,
+  isHttpUrl,
+  embedPayload,
+  MAX_TEXT_ATTACHMENT_BYTES,
+} = require("../lib/content-limits");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,9 +24,10 @@ module.exports = {
   async execute(interaction) {
     const userQuestion = interaction.options.getString("pergunta");
 
-    if (!userQuestion) {
+    if (!validText(userQuestion)) {
       return respond(interaction, {
-        content: "Por favor, forneça uma pergunta relacionada à programação.",
+        content:
+          "Por favor, forneça uma pergunta relacionada à programação, não vazia e de até 6000 caracteres.",
         ephemeral: true,
       });
     }
@@ -34,34 +41,44 @@ module.exports = {
         )}&site=stackoverflow`,
       );
 
+      if (!Array.isArray(response.data?.items)) {
+        throw new TypeError("Lista de perguntas inválida.");
+      }
       if (response.data.items.length > 0) {
         const topResult = response.data.items[0];
-        const answerLink = topResult.is_answered
-          ? `\nResposta: \`${topResult.link}\``
-          : "";
-
-        const exampleEmbed = new EmbedBuilder()
-          .setColor("#ff9c00")
-          .setAuthor({
-            name: `Stack Overflow`,
-            iconURL: `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`,
-            url: `${topResult.link}`,
-          })
-          .setTitle(`${topResult.title}`)
-          .setThumbnail(
-            `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`,
-          )
-          .addFields({
-            name: "Answer link",
-            value: `${topResult.link}` || "N/A",
-          })
-          .setURL(`${topResult.link}`)
-          .setFooter({
-            text: "CodeBucket",
-            iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
-          })
-          .setTimestamp();
-        payload = { embeds: [exampleEmbed] };
+        if (
+          !validText(topResult?.title, MAX_TEXT_ATTACHMENT_BYTES) ||
+          !isHttpUrl(topResult.link)
+        ) {
+          throw new TypeError("Pergunta inválida.");
+        }
+        payload = embedPayload(
+          {
+            color: 0xff9c00,
+            author: {
+              name: `Stack Overflow`,
+              icon_url: `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`,
+              url: topResult.link,
+            },
+            title: topResult.title,
+            thumbnail: {
+              url: `https://pbs.twimg.com/profile_images/1220067947798024192/30eZhfxx_400x400.png`,
+            },
+            fields: [
+              {
+                name: "Answer link",
+                value: topResult.link,
+              },
+            ],
+            url: topResult.link,
+            footer: {
+              text: "CodeBucket",
+              icon_url: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
+            },
+            timestamp: new Date().toISOString(),
+          },
+          "pergunta.txt",
+        );
       } else {
         payload = {
           content:

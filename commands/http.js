@@ -1,6 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
 const { getJson } = require("../lib/http-client");
+const {
+  validText,
+  embedPayload,
+  MAX_TEXT_ATTACHMENT_BYTES,
+} = require("../lib/content-limits");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,6 +20,12 @@ module.exports = {
 
   async execute(interaction) {
     const code = interaction.options.getInteger("codigo");
+    if (!Number.isInteger(code) || code < 100 || code > 599) {
+      return respond(interaction, {
+        content: "Informe um código HTTP inteiro entre 100 e 599.",
+        ephemeral: true,
+      });
+    }
 
     // Tratamento especial para códigos informativos (1xx)
     if (code >= 100 && code < 200) {
@@ -42,7 +53,12 @@ module.exports = {
 
       const data = response.data;
 
-      if (!data || !data.code) {
+      if (
+        !Number.isInteger(data?.code) ||
+        data.code < 100 ||
+        data.code > 599 ||
+        !validText(data.description, MAX_TEXT_ATTACHMENT_BYTES)
+      ) {
         payload = {
           content: "Não foi possível obter informações para esse código.",
           ephemeral: true,
@@ -62,22 +78,26 @@ module.exports = {
           color = "#0099ff"; // cor padrão para os demais
         }
 
-        const embed = new EmbedBuilder()
-          .setColor(color)
-          .setTitle(`Código HTTP ${data.code}`)
-          .setDescription(`**${data.description}**`)
-          .addFields({
-            name: "Mais Informações",
-            value: `[Clique aqui para mais detalhes](https://httpstatuses.com/${data.code})`,
-            inline: false,
-          })
-          .setFooter({
-            text: "CodeBucket",
-            iconURL: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
-          })
-          .setTimestamp();
-
-        payload = { embeds: [embed] };
+        payload = embedPayload(
+          {
+            color: Number.parseInt(color.slice(1), 16),
+            title: `Código HTTP ${data.code}`,
+            description: `**${data.description}**`,
+            fields: [
+              {
+                name: "Mais Informações",
+                value: `[Clique aqui para mais detalhes](https://httpstatuses.com/${data.code})`,
+                inline: false,
+              },
+            ],
+            footer: {
+              text: "CodeBucket",
+              icon_url: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
+            },
+            timestamp: new Date().toISOString(),
+          },
+          "codigo-http.txt",
+        );
       }
     } catch {
       payload = {

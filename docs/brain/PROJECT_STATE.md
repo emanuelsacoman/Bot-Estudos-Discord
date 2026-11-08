@@ -1,6 +1,6 @@
 # Estado atual do projeto
 
-Atualizado na **Fase P1.3, 2026-11-07**, America/Sao_Paulo. Base da tarefa: branch `develop`, commit `a79f13a7a0059be8aa465433ef81f784b482940c` (`P1.2 Concluída`), árvore inicialmente limpa com 53 arquivos rastreados. P1.2 já está commitada. Não houve fetch, merge, commit ou push nesta tarefa; alterações P1.3 estão no diretório de trabalho. O estado remoto atual não foi consultado.
+Atualizado na **P2.1, 2026-11-07**, America/Sao_Paulo. Base da tarefa: **develop / e23374279da78591219adf15547eadb10bfe3a24** (`P1.3 concluída`), árvore inicialmente limpa. P1.3 já commitada; mudanças P2.1 sem commit/push. Não houve fetch/merge/operação remota e o estado remoto não foi consultado. Os resultados anteriores abaixo são registros históricos.
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
 
@@ -31,9 +31,11 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 | `DONE` | P1.3: [catálogo](../../lib/command-catalog.js) compartilhado valida contrato, duplicatas, builders/payloads e JSON seguro, com snapshot imutável e recusa de conjunto vazio. [Registro](../../lib/registration.js) separa preparação/envio: CLI exige argumento único exato, dry-run não lê credenciais e o envio revalida confirmação/configuração/payload antes de criar REST. PUT único, timeout de 15 s e zero retries. R04/R13 `RESOLVED` localmente; R03 `MITIGATED`. |
 | `DONE` | P1.3: [timers.js](../../lib/timers.js) limita duração inteira a 1–1440 min, isola servidor+usuário/DM canal+usuário, invalida callbacks obsoletos e remove estado antes de enviar, inclusive em falhas. [ADR 0001](decisions/0001-isolamento-dos-timers.md) registra a decisão autorizada. R08 `RESOLVED` no escopo local, sem persistência ou novas opções slash. |
 | `DONE` | P1.3: baseline **308/308**, suíte final **537/537**, sintaxe **46/46** e contratos **23/23** aprovados em Node 24.22.2/npm 11.19.1. Catálogo real e quatro casos do CLI foram exercitados offline sob guardas, sem credenciais/.env/rede. Demais inicializações/login/REST e relógios são simulados. Manifest/lock/dependências e helpers P1.1/P1.2 permanecem iguais à base. |
-| `IN_PROGRESS` | Nenhuma implementação adicional em andamento ao fechar P1.3 offline. |
+| `DONE` | P2.1: QR PNG em Buffer independente de cwd, sem arquivos temporários; validações e anexos completos para limites de conteúdo, HTTP até 1 MiB antes do parse e todo com budgets de texto/cardinalidade. R10/R11 `RESOLVED` localmente; [comandos](COMMANDS.md) e [qualidade](QUALITY_GATES.md). |
+| `DONE` | P2.1: baseline sequencial 537/537, suíte final **739/739**, sintaxe **52/52**, 23 contratos/hash público preservados. Node 24.22.2/npm 11.19.1; nenhuma dependência/manifest/lock alterados, instalação existente usada. Helpers anteriores preservados, com ampliação limitada de HTTP. |
+| `IN_PROGRESS` | Nenhuma implementação adicional em andamento ao fechar P2.1 offline. |
 | `MISSING` | Cobertura funcional integral de handlers/integrações. R15 está `MITIGATED` pela suíte ampliada; não há script `start`, CI ou hospedagem versionada. |
-| `MISSING` | Persistência de `/todo`, `/timer` e cooldowns; cleanup QR após falha de envio, demais limites de entrada/saída, schemas externos e recuperação operacional. São limitações, não trabalho autorizado adicional nesta entrega. |
+| `MISSING` | Persistência de `/todo`, `/timer` e cooldowns, decisão de escopo/privacidade de todo, controle integral de contratos/quota externos e recuperação operacional. P2.1 removeu arquivos QR e validou os campos consumidos/limites; nenhuma implementação adicional autorizada por esta lista. |
 | `BLOCKED` | Shim NVM global sem padrão instalado correspondente à `.nvmrc`; somente Node 20 está no gerenciador, com `auto_install=false`. Uso do runtime portátil explícito resolveu os testes locais sem alterar o padrão global; o shim não foi reparado globalmente. |
 | `NOT_CONFIRMED` | Login real, validade do token, correspondência TOKEN/CLIENT_ID, comandos registrados remotamente, permissões, disponibilidade de APIs/links, hospedagem, uptime e recuperação prática. |
 

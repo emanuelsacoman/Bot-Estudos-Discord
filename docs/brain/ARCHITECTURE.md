@@ -1,6 +1,6 @@
 # Arquitetura implementada
 
-Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização P1.3 na mesma data, a partir de `develop` / `a79f13a` (`P1.2` já commitada). Node 24 e Prettier de produção vêm do P0; SSRF/suíte permanente vêm da P1.1 e respostas/prazos HTTP da P1.2. P1.3 valida configuração e catálogo antes do login, protege o registro global e corrige o ciclo de timers, preservando nomes/opções slash. As alterações P1.3 estão sem commit. Conexão com Discord e APIs externas permanece `NOT_CONFIRMED`. Consulte também [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
+Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`. Atualização **P2.1**, mesma data, base `develop/e233742` (P1.3 já commitada). Node 24/Prettier de produção vêm do P0; SSRF vem da P1.1 e respostas/prazos HTTP da P1.2. P1.3 valida configuração/catálogo antes do login, protege registro e timers. P2.1 elimina arquivos QR, valida limites de conteúdo/estruturas externas, limita corpos HTTP e memória de todo, preservando os 23 payloads slash. Mudanças P2.1 sem commit. Discord/APIs reais continuam `NOT_CONFIRMED`. Consulte [estado](PROJECT_STATE.md), [comandos](COMMANDS.md), [operação](OPERATIONS.md) e [riscos](KNOWN_RISKS.md).
 
 ## Componentes e responsabilidades
 
@@ -17,7 +17,7 @@ Auditoria inicial de 2026-11-07, base `cea09b90889716b5b05139eaf06f8b0e858f179e`
 | [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; definição pública e comportamento permanecem locais, delegando envio de respostas e prazos HTTP aos helpers. |
 | [lib/status-http.js](../../lib/status-http.js) | Política de URLs/IPs, resolução DNS e GET de `/status` preso a um IP validado, com limites e erros sanitizados. Usa somente módulos nativos do Node. |
 | [lib/interactions.js](../../lib/interactions.js) | Defer, reply/edit/followUp por estado, visibilidade, expiração, falhas sem retry e captura de operações secundárias. `runWithErrorHandling` envolve o listener. |
-| [lib/http-client.js](../../lib/http-client.js) | GET axios e fetch/JSON com prazo total de 5000 ms, cancelamento e erro sanitizado; não substitui a política SSRF de `/status`. |
+| [lib/http-client.js](../../lib/http-client.js) | GET axios e fetch/JSON com prazo total de 5000 ms, corpo até 1 MiB antes do parse, cancelamento e erro sanitizado; não substitui a política SSRF de `/status`. |
 | [lib/timers.js](../../lib/timers.js) | Duração e chave de contexto, Map de agendamentos com relógio injetável, cancelamento/expiração por identidade e captura do envio final. |
 | [tests/](../../tests/) | Testes offline de contratos, SSRF, interações, HTTP, configuração, bootstrap, registro e timers, sem credenciais ou rede reais. |
 | [images/](../../images/) | Três imagens versionadas; `lofiradio.jpeg` e `lofiicon.png` são anexadas pelo comando Lofi. A presença de `topgg.png` não implica seu uso por `/vote`. |
@@ -52,7 +52,7 @@ flowchart TD
     Execute --> Status[lib/status-http.js: destino validado]
     Status --> APIs
     Execute --> Memory[Map todo / manager timers em memória]
-    Execute --> Files[QR PNG temporário no cwd]
+    Execute --> Files[QR PNG e texto em Buffers por resposta]
     Register[deploy-commands.js: CLI separada] --> Mode{argumento único}
     Mode --> DryRun[dry-run: somente catálogo, sem env ou REST]
     Mode --> Confirm[confirmação: env + config + catálogo]
@@ -78,7 +78,7 @@ O listener inteiro é envolvido por `runWithErrorHandling`; select, cooldown e o
 
 Defer é público por padrão. Para manter erros efêmeros depois dele, o helper conclui o loading com U+200B neutro, envia o resultado privado em follow-up com flag 64 e remove o placeholder. A edição original nunca recebe conteúdo privado; uma falha encerra a sequência, podendo deixar o placeholder neutro. Isso respeita a visibilidade imutável do reconhecimento e evita a semântica especial do primeiro follow-up após defer, descrita no [contrato Discord](https://docs.discord.com/developers/interactions/receiving-and-responding).
 
-Reações e cleanup QR pós-sucesso usam `runSecondary`, que aguarda/captura falha sem invalidar a resposta principal. O manager de timers captura o envio tardio depois de remover o agendamento, sem reutilizar a interação. Geração de QR propaga falhas ao tratamento central; falha no envio ainda pode deixar arquivo temporário. Os prazos são verificados antes de cada chamada REST (3 s sem reconhecimento, 15 min para interação reconhecida desde a criação); rede/carga, relógio local e operação remota continuam limitações explícitas.
+Reações usam `runSecondary`, que aguarda/captura falha sem invalidar a resposta principal. O manager de timers captura o envio tardio depois de remover o agendamento, sem reutilizar a interação. P2.1 gera QR em Buffer, captura falhas de geração com aviso privado e não cria arquivo mesmo se o envio falhar. Os prazos são verificados antes de cada chamada REST (3 s sem reconhecimento, 15 min para interação reconhecida desde a criação); rede/carga, relógio local e operação remota continuam limitações explícitas.
 
 ## Registro e autenticação
 
@@ -132,9 +132,9 @@ As faixas devem ser revistas quando os registros especiais [IPv4](https://www.ia
 
 - `/todo` mantém Map por usuário, compartilhado entre servidores; essa exposição de contexto continua em [R09](KNOWN_RISKS.md#r09). `/timer` usa Map por usuário+servidor, ou usuário+canal de DM, conforme [ADR 0001](decisions/0001-isolamento-dos-timers.md). Ambos são voláteis, sem backup/persistência.
 - `/timer` aceita 1–1440 minutos inteiros sem coerção. O scheduler e relógio são injetáveis; cada entry tem identidade própria. Substituição válida agenda antes de cancelar o anterior; cancelamento/expiração removem o estado e callbacks obsoletos não afetam o novo timer. O aviso não é reenviado e um envio já iniciado não é cancelado retroativamente. Falha da confirmação mantém o efeito local.
-- `/qrcode` grava PNG no diretório de execução, anexa e remove o arquivo após reply bem-sucedido. Diferentemente das imagens Lofi, seu caminho não parte de `__dirname`.
+- `/qrcode` gera PNG em Buffer por execução; anexos de texto extensos também são Buffers, sem escrita/cwd/cleanup. [content-limits.js](../../lib/content-limits.js) valida limites individuais/agregados e preserva conteúdo completo em anexo; [todo-store.js](../../lib/todo-store.js) limita texto/cardinalidade das listas. Políticas em [COMMANDS](COMMANDS.md).
 - Runtime e registro importam todos os módulos pelo mesmo catálogo: uma dependência ausente bloqueia a preparação inteira com erro sanitizado, antes de login/PUT. A validação não isola efeitos arbitrários no topo de módulos JavaScript.
 - `/docs` distribui a definição do menu no módulo e a interpretação das opções em `index.js`. `/help` deriva dinamicamente nomes e descrições da Collection de comandos carregados, sem consultar o registro remoto.
 - IDs, cores, rodapés, links e mensagens estão repetidos nos comandos. Não há configuração central desses dados.
 
-Oportunidades **propostas, sem implementação adicional nesta tarefa**: rotear componentes por contrato explícito, validar schemas externos, definir encerramento geral e decidir persistência/privacidade de `/todo`. Respostas/prazos HTTP foram compartilhados na P1.2; configuração, catálogo, bootstrap/registro e timers foram tratados na P1.3. A sequência sugerida está em [ROADMAP.md](ROADMAP.md); não representa aprovação automática de implementação. R04/R08/R13 são avaliados no escopo local e com as evidências de [QUALITY_GATES](QUALITY_GATES.md), sem certificar operação remota.
+Oportunidades **propostas, sem implementação adicional nesta tarefa**: rotear componentes por contrato explícito, ampliar governança de contratos/quota externos, definir encerramento geral e decidir persistência/privacidade de `/todo`. Respostas/prazos HTTP foram compartilhados na P1.2; configuração, catálogo, bootstrap/registro e timers foram tratados na P1.3. A sequência sugerida está em [ROADMAP.md](ROADMAP.md); não representa aprovação automática de implementação. R04/R08/R13 são avaliados no escopo local e com as evidências de [QUALITY_GATES](QUALITY_GATES.md), sem certificar operação remota.

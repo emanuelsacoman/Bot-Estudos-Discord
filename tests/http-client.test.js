@@ -147,7 +147,9 @@ test("fetchJson entrega status e JSON usando AbortSignal", async (t) => {
       const client = createHttpClient({
         fetch: async (url, options) => {
           calls.push({ url, options });
-          return { status, json: async () => ({ message: "controlled" }) };
+          return new Response(JSON.stringify({ message: "controlled" }), {
+            status,
+          });
         },
       });
       assert.deepEqual(await client.fetchJson("https://example.com"), {
@@ -170,10 +172,12 @@ test("fetchJson inclui leitura e parse do corpo no mesmo prazo total", async () 
       signal = options.signal;
       return {
         status: 200,
-        json: () => {
-          parsed = true;
-          return new Promise(() => {});
-        },
+        body: new ReadableStream({
+          pull() {
+            parsed = true;
+            return new Promise(() => {});
+          },
+        }),
       };
     },
   });
@@ -193,7 +197,7 @@ test("fetchJson sanitiza falha de conexão e JSON inválido", async (t) => {
       };
       const client = createHttpClient({
         fetch:
-          failAt === "fetch" ? fail : async () => ({ status: 200, json: fail }),
+          failAt === "fetch" ? fail : async () => new Response("{INVALID_JSON"),
       });
       await assert.rejects(
         client.fetchJson("https://example.com"),
