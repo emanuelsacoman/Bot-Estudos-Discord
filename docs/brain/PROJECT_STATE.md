@@ -1,6 +1,6 @@
 # Estado atual do projeto
 
-Atualizado na **P2.2, 2026-11-07**, America/Sao_Paulo. Base da tarefa: **develop/cf65c1411c422b57d083aaffa659627b0d5ba5bb**, árvore inicialmente limpa. P2.1 já commitada; mudanças P2.2 sem commit/push. Não houve fetch/merge/operação remota e o estado remoto não foi consultado. Os resultados anteriores abaixo são registros históricos.
+Atualizado na **decisão de estado temporário, 2026-11-07**, America/Sao_Paulo. Base documental: **develop/868774b3ad25ae36c744fb04cf829c20e22708ec**, árvore inicialmente limpa. P2.2 já commitada; esta decisão sem commit/push. Não houve fetch/merge/operação remota e o estado remoto não foi consultado. Resultados de fases anteriores abaixo são históricos.
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
 
@@ -35,9 +35,10 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 | `DONE` | P2.1: baseline sequencial 537/537, suíte final **739/739**, sintaxe **52/52**, 23 contratos/hash público preservados. Node 24.22.2/npm 11.19.1; nenhuma dependência/manifest/lock alterados, instalação existente usada. Helpers anteriores preservados, com ampliação limitada de HTTP. |
 | `DONE` | P2.2: `/todo` isolado por servidor+usuário e DM+usuário, com todas as respostas/anexos efêmeros, erros sem tarefas e cotas agregadas por usuário; [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md). R09 é `MITIGATED`, pois reiniciar ainda apaga tarefas, sem sincronização/recuperação/persistência. |
 | `DONE` | P2.2: baseline **739/739**, suíte final **765/765**, sintaxe **53/53** e contratos **23/23** aprovados em Node 24.22.2/npm 11.19.1, com hash público preservado. 26 casos adicionados e 16 anteriores de todo adaptados para privacidade/contexto; detalhes em [qualidade](QUALITY_GATES.md). Sem dependências novas, login, registro remoto ou reinício de bot real. |
-| `IN_PROGRESS` | Nenhuma implementação adicional em andamento ao fechar P2.2 offline. |
+| `DONE` | Responsável aceitou estado operacional exclusivamente em memória no [ADR 0003](decisions/0003-estado-operacional-temporario.md): sem banco, arquivos de estado ou dependências/infraestrutura de persistência. Perda após reinício é comportamento conhecido e aceito; preservados limites, isolamento, privacidade e os 23 contratos. R09 continua `MITIGATED`. Entrega exclusivamente documental, compatível com o código atual. |
+| `IN_PROGRESS` | Nenhuma implementação adicional nesta decisão documental. |
 | `MISSING` | Cobertura funcional integral de handlers/integrações. R15 está `MITIGATED` pela suíte ampliada; não há script `start`, CI ou hospedagem versionada. |
-| `MISSING` | Persistência de `/todo`, `/timer` e cooldowns, sincronização entre processos, recuperação após falha de hospedagem e requisitos de retenção/recuperação de todo; controle integral de contratos/quota externos. Escopo/privacidade de todo foram definidos na P2.2, sem autorizar banco/infra ou reinício. |
+| `DONE` | Não persistir tarefas/timers/cooldowns é uma restrição arquitetural aceita, não recurso `MISSING`. Não há sincronização entre processos ou recuperação desse estado após falha de hospedagem; essas consequências são aceitas. Controle integral de contratos/quota externos permanece pendente em R16, separado da política de estado. |
 | `BLOCKED` | Shim NVM global sem padrão instalado correspondente à `.nvmrc`; somente Node 20 está no gerenciador, com `auto_install=false`. Uso do runtime portátil explícito resolveu os testes locais sem alterar o padrão global; o shim não foi reparado globalmente. |
 | `NOT_CONFIRMED` | Login real, validade do token, correspondência TOKEN/CLIENT_ID, comandos registrados remotamente, permissões, disponibilidade de APIs/links, hospedagem, uptime e recuperação prática. |
 
@@ -56,7 +57,7 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 
 ## Métodos e limites
 
-P2.2 conserva o armazenamento em memória, sem persistência externa: reiniciar apaga as tarefas, processos não sincronizam estado e falha de hospedagem não tem recuperação implementada. As cotas de 100 tarefas e 64 KiB são somadas por usuário entre todos os servidores/DM, com 8 MiB e 1024 usuários distintos por processo; não se ampliam pela criação de novos contextos. Não há expulsão silenciosa nem migração automática de listas globais antigas. A tarefa não acessou estado real nem reiniciou o bot. Persistência futura exige decisão arquitetural própria; [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md) registra a decisão de escopo/privacidade e a transição operacional limitada.
+O [ADR 0003](decisions/0003-estado-operacional-temporario.md) confirma o armazenamento exclusivamente em memória como política deliberada: reiniciar apaga tarefas/timers/cooldowns, processos não sincronizam esse estado e falha de hospedagem não o recupera. Não implementar bancos ou arquivos de estado. Mantêm-se as cotas de 100 tarefas e 64 KiB agregadas por usuário entre servidores/DM, com 8 MiB e 1024 usuários distintos por processo, sem expulsão silenciosa; isolamento/privacidade seguem os ADRs 0001/0002. A tarefa documental não acessou estado real nem reiniciou o bot. Persistência não é pendência técnica; alterar essa restrição exigiria decisão explícita que substitua o ADR 0003. Recuperação do código/credenciais e validação de operação remota continuam assuntos separados, sem promessa de recuperar dados temporários.
 
 Na auditoria inicial foi usado Node **v20.20.0**, sem instalação. Na Fase 1 foi baixado o runtime oficial **v24.22.2**, com npm **11.19.1**, para área local ignorada. Duas instalações npm independentes baixaram somente o grafo travado no lock, sem cache antigo ou `.env`. Foram comparados os 85 pacotes do lock anterior/atual para garantir ausência de atualizações e os payloads dos comandos para preservar seus contratos públicos.
 

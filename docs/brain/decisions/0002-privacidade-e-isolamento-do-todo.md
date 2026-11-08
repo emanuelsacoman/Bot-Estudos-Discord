@@ -4,6 +4,8 @@
 - **Estado:** aceita na implementação autorizada da P2.2.
 - **Escopo:** `/todo`, armazenamento em memória, sem alterar nomes/opções slash.
 
+**Evolução em 2026-11-07:** o [ADR 0003](0003-estado-operacional-temporario.md) aceita deliberadamente a volatilidade e estabelece estado exclusivamente em memória. Substitui a expectativa abaixo de uma futura decisão pendente de persistência; escopo, privacidade e cotas permanecem válidos. O registro histórico não foi apagado.
+
 ## Contexto e autorização
 
 Na P2.1, uma lista era global por usuário e suas confirmações/listagem normais eram públicas. Assim, o mesmo usuário podia exibir acidentalmente tarefas de um servidor em outro. O pedido P2.2 determina explicitamente servidor `guildId + userId`, DM `DM + userId`, privacidade e preservação das cotas, sem persistência externa. Esta decisão estabelece esse comportamento e mantém o risco de perda por reinício separado da exposição de contexto.

@@ -4,6 +4,8 @@
 - **Estado:** aceita na implementação autorizada da P1.3.
 - **Escopo:** `/timer`, sem persistência e sem alterar nomes/opções slash.
 
+**Evolução em 2026-11-07:** o [ADR 0003](0003-estado-operacional-temporario.md) estabelece estado operacional exclusivamente em memória e aceita deliberadamente a perda por reinício. O isolamento e as demais decisões abaixo permanecem válidos; o texto histórico é preservado.
+
 ## Contexto e autorização
 
 O timer anterior usava somente o ID do usuário. Assim, definir ou cancelar um timer em um servidor podia substituir/cancelar o timer desse usuário em outro servidor. O pedido P1.3, seção R08, determina priorizar isolamento entre servidores quando for necessário escolher o escopo. Esta decisão estabelece o comportamento a partir dessa tarefa; não descreve uma intenção histórica.
