@@ -98,11 +98,13 @@ function interaction({
   commandName = "controlled",
   userId = "controlled-user",
   select,
+  customId = "codebucket:docs:select",
   failReply = false,
 } = {}) {
   const calls = [];
   const value = {
     commandName,
+    customId,
     user: { id: userId },
     values: select === undefined ? [] : [select],
     createdTimestamp: Date.now(),
@@ -142,6 +144,8 @@ test("importar index é seguro e não carrega SDK, catálogo, dotenv ou handlers
     "dotenv",
     "./lib/command-catalog",
     "./lib/interactions",
+    "./lib/documentation-catalog",
+    "./lib/documentation-interactions",
   ]);
   t.mock.method(Module, "_load", function (request, parent, isMain) {
     assert.equal(
@@ -350,6 +354,71 @@ test("seleção de docs preserva resposta pública e fallback para opção desco
     assert.equal(Boolean(request.calls[0].payload.flags & 64), false);
   }
   cleanup();
+});
+
+test("roteamento ignora selects alheios e antigos sem tratar como slash", async (t) => {
+  const timers = simulatedTimers(t);
+  const { configureClient } = require("../index");
+  const client = fakeClient();
+  const cleanup = configureClient(client, catalog());
+  t.after(cleanup);
+  for (const customId of [
+    "select",
+    "other:select",
+    "codebucket:docs:select:extra",
+    undefined,
+  ]) {
+    const request = interaction({ select: "javascript" });
+    request.value.customId = customId;
+    request.value.isCommand = () => {
+      assert.fail("select de outro componente não é comando slash");
+    };
+    Object.defineProperty(request.value, "values", {
+      get() {
+        assert.fail("não deve ler valores de outro componente");
+      },
+    });
+    await dispatch(client, request.value);
+    assert.deepEqual(request.calls, []);
+  }
+  assert.equal(timers.active.size, 0);
+});
+
+test("roteamento de docs valida values e preserva o wrapper central de erros", async (t) => {
+  const timers = simulatedTimers(t);
+  const logs = [];
+  t.mock.method(console, "error", (...args) => logs.push(args));
+  const { configureClient } = require("../index");
+  const client = fakeClient();
+  const cleanup = configureClient(client, catalog());
+  t.after(cleanup);
+  for (const values of [
+    undefined,
+    [],
+    ["javascript", "python"],
+    ["constructor"],
+  ]) {
+    const request = interaction({ select: "javascript" });
+    request.value.values = values;
+    await dispatch(client, request.value);
+    assert.deepEqual(
+      request.calls.map(({ method }) => method),
+      ["reply"],
+    );
+    assert.equal(contentOf(request.calls[0].payload), "Opção não reconhecida.");
+  }
+  const failing = interaction({ select: "javascript", failReply: true });
+  await assert.doesNotReject(dispatch(client, failing.value));
+  assert.deepEqual(
+    failing.calls.map(({ method }) => method),
+    ["reply"],
+  );
+  assert.doesNotMatch(JSON.stringify(logs), /SENSITIVE_SENTINEL/);
+  const expired = interaction({ select: "javascript" });
+  expired.value.createdTimestamp = Date.now() - 3000;
+  await assert.doesNotReject(dispatch(client, expired.value));
+  assert.deepEqual(expired.calls, []);
+  assert.equal(timers.active.size, 0);
 });
 
 test("comando que lança erro recebe resposta genérica sem detalhe interno", async (t) => {

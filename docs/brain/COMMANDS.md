@@ -14,6 +14,8 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 **Decisão Estado Temporário — 2026-11-07, base `develop/868774b`:** o [ADR 0003](decisions/0003-estado-operacional-temporario.md) aceita deliberadamente a perda de tarefas, timers e cooldowns após reinícios e mantém todo estado operacional exclusivamente em memória. Não se implementam bancos, arquivos de estado ou dependências/infraestrutura de persistência. Isolamento, privacidade, cotas e os 23 contratos permanecem iguais; esta atualização é documental, e a P2.2 já está commitada.
 
+**Atualização P2.3 — 2026-11-08, base `develop/67c25a3`:** `/docs` e seu handler passam a consumir o catálogo único de tecnologias e o componente usa `codebucket:docs:select`. As 25 opções históricas e os 23 payloads slash são preservados. Menus antigos com `select` são ignorados e podem ser substituídos por nova execução de `/docs`; Laravel permanece apenas como registro histórico, sem opção/roteamento. Nenhuma persistência ou dependência nova. R14 `RESOLVED` no escopo offline: suíte 863/863, sintaxe 56/56 e 23 contratos/hash preservados. As 25 opções e mensagens foram comparadas com a base; somente a URL C++ mudou deliberadamente. Evidências em [QUALITY_GATES](QUALITY_GATES.md).
+
 - Todos os módulos exportam `data` e `execute(interaction)`. [command-catalog.js](../../lib/command-catalog.js) carrega e valida o mesmo conjunto para o [runtime](../../index.js) e o [registro global](../../deploy-commands.js): catálogo não vazio, contratos serializáveis, nomes/opções sem duplicatas e snapshot JSON válido. Falha bloqueia a preparação, sem aceitar catálogo parcial. Carregar ou serializar localmente não comprova registro remoto.
 - Todas as opções de entrada documentadas são **obrigatórias**. Somente `/formatar` define escolhas fechadas; os demais textos são livres. Não há `setMinValue`, `setMaxValue`, `setMinLength` ou `setMaxLength` nos builders atuais.
 - O runtime aplica cooldown de **5 segundos por comando e usuário**, comum a todos os servidores daquele processo. Nenhum módulo configura cooldown próprio. O timestamp é registrado antes de executar; uma execução que falha também consome o intervalo. Reiniciar perde os cooldowns. Menus não passam por esse controle.
@@ -90,13 +92,15 @@ Responde embed com palavras (`trim`, separação por espaços e filtro), letras 
 
 ### `/docs`
 
-**Fonte:** [docs.js](../../commands/docs.js) e mapa/handler de seleção em [index.js](../../index.js). **Opções slash:** nenhuma.
+**Fonte:** [docs.js](../../commands/docs.js), [catálogo único](../../lib/documentation-catalog.js) e [handler de seleção](../../lib/documentation-interactions.js), delegado por [index.js](../../index.js). **Opções slash:** nenhuma; nome `docs` e descrição “Acesse as documentações que quiser” preservados.
 
-Envia embed e menu de seleção com `customId="select"`. Os 25 valores disponíveis são `angular`, `csharp`, `cpp`, `css`, `dart`, `discordjs`, `git`, `go`, `godot`, `html`, `ionic`, `java`, `javascript`, `kotlin`, `python`, `react`, `ruby`, `swift`, `typescript`, `unreal`, `unity`, `rust`, `php`, `vuejs` e `jquery`.
+Envia o mesmo embed, placeholder e menu de seleção com `customId="codebucket:docs:select"`. Os 25 valores disponíveis são `angular`, `csharp`, `cpp`, `css`, `dart`, `discordjs`, `git`, `go`, `godot`, `html`, `ionic`, `java`, `javascript`, `kotlin`, `python`, `react`, `ruby`, `swift`, `typescript`, `unreal`, `unity`, `rust`, `php`, `vuejs` e `jquery`.
 
-O handler global usa o primeiro valor selecionado para responder publicamente com texto/link. As URLs são estáticas; o bot não consulta o conteúdo das documentações. Há uma entrada `laravel` em `index.js`, mas **Laravel não é oferecido no menu atual**.
+O catálogo determina IDs, labels, descrições, URLs e ordem pela posição no array; o menu e o lookup do handler derivam das mesmas entradas. Para adicionar, editar, remover ou reordenar uma tecnologia, altere apenas [documentation-catalog.js](../../lib/documentation-catalog.js) e execute a suíte offline. Há no máximo 25 opções: o validador recusa a 26ª, sem paginação automática. Laravel existia apenas no mapa anterior e foi retirado do roteamento; não é acrescentado ao menu nem aceito como seleção.
 
-**Erros e limites:** menu e mapa são mantidos em arquivos separados. O handler recebe qualquer string select menu sem filtrar `customId` nem restringir ao autor original; valor desconhecido recebe “Opção não reconhecida.” Links podem estar desatualizados; disponibilidade `NOT_CONFIRMED`.
+O handler exige string select com o identificador correto e array contendo exatamente uma string conhecida. Responde publicamente com o texto/link existente usando `respond`; URLs são estáticas e o bot não consulta o conteúdo das documentações. C++ passa do agregador DevDocs para a FAQ da [Standard C++ Foundation](https://isocpp.org/faq); os demais destinos históricos são preservados nesta etapa.
+
+**Erros e limites:** validação local recusa IDs não canônicos/duplicados, catálogo vazio/acima de 25, labels/descrições inválidos/acima de 100 unidades UTF-16, URLs HTTPS inválidas/com credenciais e resposta acima de 2000. Seleção malformada/desconhecida recebe “Opção não reconhecida.” sem publicar a entrada. Outros tipos/IDs de componentes são ignorados. Menus antigos com `customId="select"` também são ignorados: esse ID genérico não identifica a origem com segurança; execute `/docs` novamente para obter o menu atual. Não há edição/remoção automática de mensagens antigas nem restrição ao autor original. Falha de envio e expiração seguem as proteções do helper comum, sem retry ou exceção interna exposta. Disponibilidade/atualidade dos links e entrega real permanecem `NOT_CONFIRMED`.
 
 ### `/exercise`
 

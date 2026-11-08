@@ -7,6 +7,9 @@ function configureClient(client, catalog) {
     runWithErrorHandling,
     runSecondary,
   } = require("./lib/interactions");
+  const {
+    handleDocumentationSelect,
+  } = require("./lib/documentation-interactions");
   const cooldowns = new Collection();
   const cooldownHandles = new Set();
   const onClientError = () => console.error("Erro de conexão com o Discord.");
@@ -184,50 +187,15 @@ function configureClient(client, catalog) {
   });
   client.on(Events.Error, onClientError);
 
-  // Linguagens para 'docs.js'
-  const selectedOptions = {
-    angular: "Documentação do Angular: https://angular.io/docs",
-    csharp:
-      "Documentação do C#: https://learn.microsoft.com/en-us/dotnet/csharp/",
-    cpp: "Documentação do C++: https://devdocs.io/cpp/",
-    css: "Documentação do CSS: https://developer.mozilla.org/en-US/docs/Web/CSS",
-    discordjs:
-      "Documentação do Discord.js: https://discordjs.guide/#before-you-begin",
-    godot: "Documentação do Godot: https://docs.godotengine.org/en/stable/",
-    html: "Documentação do HTML: https://developer.mozilla.org/en-US/docs/Web/HTML",
-    ionic: "Documentação do Ionic: https://ionicframework.com/docs",
-    java: "Documentação do Java: https://docs.oracle.com/en/java/",
-    javascript:
-      "Documentação do Javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript",
-    python: "Documentação do Python: https://www.python.org",
-    react:
-      "Documentação do React: https://reactjs.org/docs/getting-started.html",
-    typescript:
-      "Documentação do TypeScript: https://www.typescriptlang.org/docs/",
-    unreal: "Documentação da Unreal Engine: https://docs.unrealengine.com/",
-    unity: "Documentação do Unity: https://learn.unity.com/",
-    dart: "Documentação do Dart: https://dart.dev/guides",
-    go: "Documentação do Go: https://golang.org/doc/",
-    kotlin: "Documentação do Kotlin: https://kotlinlang.org/docs/home.html",
-    ruby: "Documentação do Ruby: https://www.ruby-lang.org/pt/documentation/",
-    swift: "Documentação do Swift: https://swift.org/documentation/",
-    git: "Documentação do Git: https://git-scm.com/docs/git/pt_BR",
-    laravel: "Documentação do Laravel: https://laravel.com/docs/10.x/readme",
-    rust: "Documentação do Rust: https://doc.rust-lang.org/book/",
-    php: "Documentação do PHP: https://www.php.net/manual/en/",
-    vuejs: "Documentação do Vue.js: https://vuejs.org/v2/guide/",
-    jquery: "Documentação do jQuery: https://api.jquery.com/",
-  };
-
   // Listener de interações com o bot
   client.on(Events.InteractionCreate, (interaction) =>
     runWithErrorHandling(interaction, async () => {
-      if (interaction.isStringSelectMenu()) {
-        const selected = interaction.values[0];
-        const selectedOption = selectedOptions[selected];
-
-        await respond(interaction, selectedOption || "Opção não reconhecida.");
-      } else if (interaction.isCommand()) {
+      if (interaction?.isStringSelectMenu?.()) {
+        // Other components, including legacy generic "select" menus, are ignored.
+        await handleDocumentationSelect(interaction);
+        return;
+      }
+      if (interaction?.isCommand?.()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) {
           console.error("Comando não encontrado");
