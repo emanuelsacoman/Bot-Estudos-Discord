@@ -1,6 +1,10 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { getJson } = require("../lib/http-client");
+const { getJson, HttpRequestError } = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
 const {
   validText,
   isHttpUrl,
@@ -35,12 +39,27 @@ module.exports = {
     try {
       const response = await getJson(
         `https://api.github.com/search/repositories?q=language:${encodeURIComponent(linguagem)}&sort=stars&order=desc`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            "User-Agent": "CodeBucket",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        },
       );
+      requireSuccessfulResponse(response);
       const data = response.data;
 
-      if (!Array.isArray(data?.items)) {
-        throw new TypeError("Lista de repositórios inválida.");
+      if (
+        !Array.isArray(data?.items) ||
+        (data.incomplete_results !== undefined &&
+          typeof data.incomplete_results !== "boolean")
+      ) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
+      const partialNotice = data.incomplete_results
+        ? "A busca retornou resultados parciais.\n"
+        : "";
       if (data.items.length > 0) {
         const topRepos = data.items.slice(0, 5);
         if (
@@ -52,24 +71,28 @@ module.exports = {
               repo.stargazers_count >= 0,
           )
         ) {
-          throw new TypeError("Repositório inválido.");
+          throw new HttpRequestError("HTTP_INVALID_BODY");
         }
         const repoList = topRepos.map(
           (repo) =>
             `• [${repo.full_name}](${repo.html_url}) - ${repo.stargazers_count} estrelas`,
         );
-        const message = `Aqui estão os top 5 repositórios de ${linguagem} no GitHub:\n${repoList.join("\n")}`;
+        const message = `${partialNotice}Aqui estão os top 5 repositórios de ${linguagem} no GitHub:\n${repoList.join("\n")}`;
 
         payload = textPayload(message, "repositorios.txt");
       } else {
         payload = textPayload(
-          `Não foi possível encontrar repositórios para a linguagem ${linguagem} no GitHub.`,
+          data.incomplete_results
+            ? "A busca retornou resultados parciais e não encontrou repositórios nesta resposta."
+            : `Não foi possível encontrar repositórios para a linguagem ${linguagem} no GitHub.`,
           "repositorios.txt",
         );
       }
-    } catch {
-      payload =
-        "Ocorreu um erro ao buscar repositórios. Tente novamente mais tarde.";
+    } catch (error) {
+      payload = apiErrorMessage(
+        error,
+        "Ocorreu um erro ao buscar repositórios. Tente novamente mais tarde.",
+      );
     }
     return respond(interaction, payload);
   },

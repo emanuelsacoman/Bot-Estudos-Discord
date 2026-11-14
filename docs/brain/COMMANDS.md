@@ -16,15 +16,17 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 **Atualização P2.3 — 2026-11-08, base `develop/67c25a3`:** `/docs` e seu handler passam a consumir o catálogo único de tecnologias e o componente usa `codebucket:docs:select`. As 25 opções históricas e os 23 payloads slash são preservados. Menus antigos com `select` são ignorados e podem ser substituídos por nova execução de `/docs`; Laravel permanece apenas como registro histórico, sem opção/roteamento. Nenhuma persistência ou dependência nova. R14 `RESOLVED` no escopo offline: suíte 863/863, sintaxe 56/56 e 23 contratos/hash preservados. As 25 opções e mensagens foram comparadas com a base; somente a URL C++ mudou deliberadamente. Evidências em [QUALITY_GATES](QUALITY_GATES.md).
 
+**Atualização P2.4 — 2026-11-13, base `develop/da6a413` (P2.3 já commitada):** confiabilidade das seis integrações externas e importação de builder de `/translate` via dependência direta `discord.js`, sem mudar os 23 payloads slash. R16 permanece `MITIGATED`: schema/quota/estabilidade dos serviços não são garantias do bot. Baseline executada em 2026-11-08: **863/863**, em Node **24.22.2**/npm **11.19.1**. Validação final em 2026-11-13: **1097/1097** testes, focais **282/282**, sintaxe **59/59** e 23 contratos/hash preservados; `/translate` com Unicode validado em instalações limpas normal/produção, sem rede. Auditoria e políticas em [Contratos externos](#contratos-externos--p24) e [qualidade](QUALITY_GATES.md).
+
 - Todos os módulos exportam `data` e `execute(interaction)`. [command-catalog.js](../../lib/command-catalog.js) carrega e valida o mesmo conjunto para o [runtime](../../index.js) e o [registro global](../../deploy-commands.js): catálogo não vazio, contratos serializáveis, nomes/opções sem duplicatas e snapshot JSON válido. Falha bloqueia a preparação, sem aceitar catálogo parcial. Carregar ou serializar localmente não comprova registro remoto.
 - Todas as opções de entrada documentadas são **obrigatórias**. Somente `/formatar` define escolhas fechadas; os demais textos são livres. Não há `setMinValue`, `setMaxValue`, `setMinLength` ou `setMaxLength` nos builders atuais.
 - O runtime aplica cooldown de **5 segundos por comando e usuário**, comum a todos os servidores daquele processo. Nenhum módulo configura cooldown próprio. O timestamp é registrado antes de executar; uma execução que falha também consome o intervalo. Reiniciar perde os cooldowns. Menus não passam por esse controle.
 - Respostas normais são públicas, exceto `/ping` e todas as operações de `/todo`. Respostas efêmeras específicas são indicadas abaixo; o bloqueio de cooldown também é efêmero.
 - [interactions.js](../../lib/interactions.js) usa `reply()` antes do reconhecimento, `editReply()` após defer ainda pendente e `followUp()` depois de uma resposta concluída. Os sete comandos HTTP deferem antes da consulta; `/question` sem pergunta e `/http` 1xx respondem imediatamente. `/formatar`, `/qrcode` e o envio de anexos de `/lofiradio` também deferem antes do trabalho demorado.
 - A privacidade do reconhecimento original é imutável. Quando um ramo efêmero sucede defer público, o helper edita o loading com U+200B neutro, envia o conteúdo privado em follow-up com flag 64 e remove o placeholder. Nenhum erro privado é colocado na resposta pública; uma falha nessa sequência interrompe novas tentativas e pode deixar o placeholder neutro.
-- Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`, agora com corpo até 1 MiB antes do parse; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros sem corpo, URL ou configuração remota.
+- Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`, agora com corpo até 1 MiB antes do parse; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros classificados sem corpo, URL ou configuração remota. P2.4 acrescenta JSON estrito, validação de status, zero redirects e pausas temporárias para limites de serviço, sem esperar ou reenviar a operação.
 - O listener trata erros conforme o estado da interação, sem repetir envios que falharam ou já foram reportados. Expiração local (3 s sem reconhecimento ou 15 min para interação reconhecida, desde a criação) e códigos terminais impedem novo envio. O erro central inicial continua público; depois do reconhecimento herda a visibilidade estabelecida. Reações usam `runSecondary`; QR agora usa somente Buffer sem exclusão; o manager de timers captura seu próprio envio tardio depois de remover o estado. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
-- Todos dependem de `discord.js`, diretamente ou pelo builder transitivo indicado em `/translate`. Permissões de acesso ao canal, envio, embeds, anexos e reações devem ser verificadas conforme o recurso usado. Os builders não impõem permissões administrativas ou restrição explícita a servidores.
+- Todos dependem de `discord.js`, incluindo o builder de `/translate` desde a P2.4. Permissões de acesso ao canal, envio, embeds, anexos e reações devem ser verificadas conforme o recurso usado. Os builders não impõem permissões administrativas ou restrição explícita a servidores.
 
 ## Limites e mudanças P2.1
 
@@ -40,9 +42,42 @@ Base `develop/e233742`, 2026-11-07. **Os 23 payloads slash permanecem idênticos
 | Todo: 1967 por tarefa | Derivado na P2.1 de 2000 menos prefixo/sufixo da antiga mensagem de duplicata, preservado como cota de compatibilidade na P2.2. O erro de duplicata agora é genérico e não repete a tarefa. |
 | Todo: 100 itens e 64 KiB de texto UTF-8 por usuário; 8 MiB de texto UTF-8/processo; 1024 usuários distintos com tarefas | Na P2.2, os 100 itens e 64 KiB são somados entre todos os servidores e DM do mesmo usuário; cada lista também respeita esses tetos. 1024 conta pessoas, não pares servidor+usuário; contextos não vazios são limitados pelas tarefas. 8 MiB continua compartilhado por todo o processo. Não são limites Discord nem medição exata de heap. Ao atingir, recusa nova inserção sem expulsar dados; remoção libera contagens/bytes e apaga contexto/usuário vazios. Leitura vazia não aloca. |
 
-Mudanças adicionais de segurança: idioma deve ter sintaxe de sigla/tag com hífens (ex.: pt-BR), repositório deve ter forma usuario/repositorio, códigos de moeda três letras, valor/taxas/produto finitos e código HTTP inteiro 100–599. Isso valida formato, sem comprovar suporte/existência remota. Parâmetros interpolados de busca/tradução são codificados. APIs com forma inesperada ou corpo acima do budget recebem os erros sanitizados existentes, sem publicar saída parcial. /translate passa a unir todos os segmentos, corrigindo a perda anterior. /github passa a exibir fallbacks para descrição/linguagem ausentes. R16 continua aberto quanto a contrato operacional/quota/dependência transitiva.
+Mudanças adicionais de segurança: idioma deve ter sintaxe de sigla/tag com hífens (ex.: pt-BR), repositório deve ter forma usuario/repositorio, códigos de moeda três letras, valor/taxas/produto finitos e código HTTP inteiro 100–599. Isso valida formato, sem comprovar suporte/existência remota. Parâmetros interpolados de busca/tradução são codificados. APIs com forma inesperada ou corpo acima do budget recebem os erros sanitizados existentes, sem publicar saída parcial. /translate passa a unir todos os segmentos, corrigindo a perda anterior. /github passa a exibir fallbacks para descrição/linguagem ausentes. Na P2.4, o import transitivo é substituído por discord.js e falhas/quota recebem tratamento delimitado; R16 permanece mitigado quanto aos contratos/quotas externos não garantidos.
 
 A falha de envio não é reinterpretada como falha de API/formatação nem repetida. /todo prepara a resposta antes de mudar a memória; uma falha de confirmação mantém o efeito local, pois a entrega pode ter ocorrido. A P2.2 altera sua privacidade/escopo conforme a ficha abaixo e o [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md). Permissão para anexos é necessária também nos fallbacks extensos; entrega real `NOT_CONFIRMED`. R04/R05/R06/R07/R08/R13 preservados.
+
+## Contratos externos — P2.4
+
+Auditoria de fontes em **2026-11-08**, conferida com o código na retomada de **2026-11-13**. A tabela descreve o contrato mínimo consumido pelo código e o comportamento implementado e testado offline na P2.4; a evidência de execução está separada em [QUALITY_GATES](QUALITY_GATES.md). Campos extras não são usados como dados confiáveis. Sucessos mantêm a visibilidade anterior; falhas de `/github` e `/repositorys` são públicas, enquanto erros de `/question`, `/translate`, `/moeda` e `/http` são efêmeros. Nenhum corpo/URL de requisição/erro bruto é publicado ou registrado.
+
+| Integração e endpoint GET | Formato, campos obrigatórios/opcionais e vazio | HTTP, indisponibilidade e compatibilidade |
+| --- | --- | --- |
+| `/github` — `https://api.github.com/repos/{owner}/{repo}` | HTTP 200 com objeto: `owner.login`, `owner.avatar_url`, `full_name`, `html_url`, `stargazers_count` e `forks_count`. Contagens inteiras seguras ≥0; URLs HTTP(S) válidas sem credenciais. `description`/`language` podem faltar, ser null ou vazias e recebem fallback. Objeto ausente não é sucesso vazio. | 404 mantém recurso não encontrado; 400/422 indicam pedido recusado; 401/403 indicam acesso recusado ou limite quando reconhecido; 429 indica limite temporário; 5xx indica indisponibilidade. O 404 do GitHub também pode ocultar recurso privado: não comprova inexistência global. |
+| `/repositorys` — `https://api.github.com/search/repositories?q=language:{linguagem}&sort=stars&order=desc` | `items` array; até cinco itens consumidos exigem `full_name`, `html_url` e contagem `stargazers_count` válida. `items: []` é resultado vazio válido. `incomplete_results`, quando presente, deve ser booleano; true produz aviso de resultado parcial. | 400/422 podem recusar consulta; 401/403/429 não viram “sem resultados”. 5xx recebe aviso de serviço indisponível. Busca é limitada e pode ser parcial mesmo com HTTP 200; não se percorrem páginas adicionais. |
+| `/question` — `https://api.stackexchange.com/2.3/search?order=desc&sort=activity&intitle={pergunta}&site=stackoverflow` | Wrapper com `items`; primeiro item exige `title`/`link` válidos. `items: []` mantém ausência privada. `error_*`, `quota_remaining` e `backoff` são validados quando presentes. Erro no wrapper não vira sucesso/ausência, mesmo sob 200. | Diferencia pedido/acesso recusado, limite e indisponibilidade. `error_id` é código do wrapper e não status HTTP: 502 significa throttle e 503 indisponibilidade temporária. `backoff` válido impõe pausa para chamadas seguintes ao mesmo método, inclusive se esta resposta traz dados válidos. |
+| `/translate` — `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={idioma}&dt=t&q={texto}` | Array com `data[0]` como array não vazio de segmentos; cada `segment[0]` deve ser string Unicode bem formada. Concatena todos os segmentos em ordem, resultado final não vazio; demais posições são ignoradas. | 400/422, 401/403, 429 e 5xx recebem mensagens de falha apropriadas, privadas. Array vazio não é tradução válida. O endpoint gtx não é a interface REST documentada da Cloud Translation; suporte formal, idiomas, termos, quota e estabilidade desse endpoint permanecem `NOT_CONFIRMED`. |
+| `/moeda` — `https://api.exchangerate-api.com/v4/latest/{ORIGEM}` | Objeto `rates`; propriedade própria `rates[DESTINO]` com número positivo finito, produto finito. `base`, quando presente, precisa coincidir com a origem. Destino ausente é aviso privado; taxa presente null/zero/tipo errado indica contrato inválido. Tabela ausente ou vazia é contrato inválido; ausência de destino não comprova inexistência global da moeda. | 404 conserva aviso de origem inválida sem comprovar suporte do provedor; demais 400/401/403/429/5xx são classificados. Precisão/atualidade e contrato/quota da interface v4 aberta não são garantidos. Não se substitui o endpoint nesta tarefa. |
+| `/http` — `https://httpstat.us/{codigo}?json`, com `Accept: application/json` | Exige objeto `code` inteiro igual ao código solicitado e `description` textual válida. Códigos 1xx permanecem locais. Resposta 204/304 sem JSON ou corpo malformado recebe aviso seguro, sem inventar descrição. | Este serviço devolve deliberadamente o status solicitado: 400/401/403/404/429/500/503 coerentes podem ser resultado funcional válido. Status/corpo divergente não é mostrado como o código pedido. Quota e disponibilidade operacional são `NOT_CONFIRMED`. |
+
+### Prazo, quota e retentativas
+
+**Política local comum:** defer antes da consulta, prazo total de **5 s**, incluindo leitura/parse, e corpo de até **1 MiB**, contado antes do JSON e após descompressão no adapter axios. JSON inválido, UTF-8 inválido em ambos os transportes, schema incompleto/tipos inesperados, excesso, DNS/conexão, cancelamento e timeout viram falhas sanitizadas. Não há redirects ou retry automático, fila, espera por quota ou cache de resultados. O prazo limita trabalho assíncrono; não preempta JSON.parse ou outro JavaScript síncrono que bloqueie o event loop. A proteção SSRF de `/status` segue no transporte próprio e não usa este helper.
+
+Pausas operacionais existem somente em memória. Um limite HTTP reconhecido de um host fixo pode adiar chamadas seguintes usando `Retry-After`/reset válido; sem indicação válida, **60 s** é uma política conservadora local, não reset garantido pelo provedor. A pausa por cabeçalho tem teto local de **24 h**; um prazo maior do provedor não é observado integralmente por esse mecanismo. Os cinco escopos são as quatro origens fixas GitHub, tradução, câmbio e httpstat.us, mais o método Stack Exchange search; GitHub compartilha a pausa entre seus dois comandos. `backoff` Stack Exchange é por método, com inteiro de 0–86400 s aceito pela política local; quota esgotada sem prazo conhecido também usa pausa conservadora. O bloqueio devolve aviso imediato, sem manter a interação esperando. Reinício perde essas pausas conforme [ADR 0003](decisions/0003-estado-operacional-temporario.md), e processos não as sincronizam. Pausa não garante quota disponível ao terminar nem cancela requisições já em curso.
+
+**Políticas dos provedores consultadas:** GitHub documenta limite não autenticado por IP de 60/h e Search de 10/min, além de limites secundários; cabeçalhos orientam pausa em 403/429. O bot não conhece o consumo de outros processos no mesmo IP. Headers de GitHub explicitam `User-Agent: CodeBucket`, `Accept: application/vnd.github+json` e versão `2022-11-28`, igual ao default documentado, sem migrar a API. Stack Exchange compartilha quota sem token por IP e exige respeitar `backoff`; a cota padrão documentada não é saldo reservado ao bot. Não se aplicam quotas Cloud Translation ao endpoint gtx nem quotas/schema do ExchangeRate v6 ao v4.
+
+**Sem retry automático:** uma nova tentativa multiplicaria quota e precisaria caber no prazo total da interação; não há evidência que justifique isso neste escopo. Falhas de entrega Discord também não são repetidas. Resultados extensos continuam completos em anexos em Buffer, com limites Discord/Unicode anteriores preservados. Disponibilidade/permissões/entrega reais permanecem `NOT_CONFIRMED`.
+
+### Referências dos provedores
+
+Fontes primárias consultadas em **2026-11-08**, somente documentação/código público; nenhuma requisição funcional aos endpoints:
+
+- GitHub: [repositório](https://docs.github.com/en/rest/repos/repos#get-a-repository), [busca](https://docs.github.com/en/rest/search/search), [limites](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), [erros e cabeçalhos](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api), [versões](https://docs.github.com/en/rest/about-the-rest-api/api-versions). A versão 2022-11-28 tem suporte documentado até 10/03/2028; sua fixação não garante disponibilidade permanente.
+- Stack Exchange: [search](https://api.stackexchange.com/docs/search), [wrapper](https://api.stackexchange.com/docs/wrapper), [throttles](https://api.stackexchange.com/docs/throttle), [erros](https://api.stackexchange.com/docs/error-handling).
+- Google: [REST formal da Cloud Translation](https://docs.cloud.google.com/translate/docs/reference/rest), que descreve recursos distintos de `translate_a/single`. Não há contrato formal confirmado para o endpoint gtx consumido.
+- ExchangeRate: [Open Access atual](https://www.exchangerate-api.com/docs/free) descreve `open.er-api.com/v6/latest`; [LTS](https://www.exchangerate-api.com/product/long-term-support) restringe a garantia a clientes pagantes, excluindo interfaces abertas/gratuitas. Não se infere garantia de v4 nem se implementa migração automaticamente.
+- httpstat.us: [projeto oficial](https://github.com/aaronpowell/httpstatus), [serialização JSON/corpos ausentes](https://raw.githubusercontent.com/aaronpowell/httpstatus/main/src/Teapot.Web/CustomHttpStatusCodeResult.cs), [roteamento](https://raw.githubusercontent.com/aaronpowell/httpstatus/main/src/Teapot.Web/StatusExtensions.cs). Fonte upstream não comprova configuração/limites do serviço hospedado.
 
 ## Inventário
 
@@ -146,7 +181,7 @@ Retorna embed estático com referências a `init`, `clone`, `stash`, `status`, `
 
 **Fonte:** [github.js](../../commands/github.js). **Opção:** `repositorio` string obrigatória no formato usuario/repositorio, até 6000, sem espaços/query/caminho adicional.
 
-Defer público antes de fetchJson na API GitHub, com 5 s e corpo até 1 MiB. HTTP 200 exige estrutura/tipos/URLs HTTP(S) válidos, contagens inteiras não negativas; exibe os mesmos dados em embed quando cabem. Descrição/linguagem opcionais ausentes têm fallback legível; dados extensos viram repositorio.txt completo. HTTP diferente de 200 continua “Repositório não encontrado.” Falha de consulta/corpo inesperado mantém erro público sanitizado; envio fora do catch, sem retry. Sem autenticação/rate-limit específico; formato local não prova existência remota.
+Defer público e fetchJson na API GitHub, com os headers explícitos e contrato da [auditoria P2.4](#contratos-externos--p24). Resposta válida mantém embed, fallbacks de descrição/linguagem e repositorio.txt completo quando extenso. Apenas 404 recebe “Repositório não encontrado.”; 403/429 e 5xx são diferenciados de inexistência. Falhas de consulta/schema continuam públicas e sanitizadas. Envio fora do catch, sem retry. Formato local não comprova existência remota ou acesso a recurso privado.
 
 ### `/help`
 
@@ -158,11 +193,11 @@ Lê `interaction.client.commands` e monta um campo de embed para cada nome/descr
 
 ### `/http`
 
-**Fonte:** [http.js](../../commands/http.js). **Opção:** `codigo` integer obrigatório, builder preservado; execute exige inteiro 100–599.
+**Fonte:** [http.js](../../commands/http.js). **Opção:** `codigo` integer obrigatório; execute exige inteiro 100–599.
 
-1xx mantém resposta local imediata sem defer/HTTP. Demais valores deferem publicamente e usam getJson/axios em httpstat.us, prazo 5 s/corpo 1 MiB, validateStatus aceita qualquer status. Exige corpo com code inteiro 100–599 e description não vazia; código remoto pode diferir do solicitado, preservando o comportamento para respostas 4xx/5xx do serviço. Embed normal mantém cor/campos/link; descrição incluindo Markdown deve caber em 4096 e soma em 6000, caso contrário codigo-http.txt completo.
+1xx continua local imediato. Demais valores deferem publicamente e usam getJson/axios no mesmo httpstat.us, com `Accept: application/json`, 5 s/1 MiB e tratamento do status solicitado descrito na [auditoria P2.4](#contratos-externos--p24). O corpo deve identificar exatamente o código pedido; 4xx/5xx coerente é resultado funcional, divergência é recusada. Corpo ausente ou JSON inválido recebe aviso privado; não se inventa descrição para 204/304. Embed/campos/cor e fallback integral codigo-http.txt preservados.
 
-Entrada inválida e corpo/falhas inesperadas recebem avisos efêmeros sanitizados, inclusive após defer público. Sem retry de envio; disponibilidade/contrato remoto `NOT_CONFIRMED`.
+Entrada inválida, limite real do serviço, indisponibilidade e falha inesperada têm avisos efêmeros sanitizados, inclusive após defer público. Falha de envio não é reinterpretada como erro de consulta nem repetida. Disponibilidade/contrato remoto `NOT_CONFIRMED`.
 
 ### `/invite`
 
@@ -182,11 +217,11 @@ Usa `process.env.LOFIRADIO_URL` ou `https://lofiradio.web.app`, prepara embed co
 
 ### `/moeda`
 
-**Fonte:** [moeda.js](../../commands/moeda.js). **Opções:** `valor` — number obrigatório; `origem` e `destino` — strings obrigatórias, exemplos USD/EUR na descrição.
+**Fonte:** [moeda.js](../../commands/moeda.js). **Opções:** `valor` number obrigatório; `origem`/`destino` strings obrigatórias de três letras, convertidas para maiúsculas, sem trim. Valor finito negativo/zero continua aceito.
 
-Converte códigos para maiúsculas, defere publicamente e usa axios GET via `getJson` em `https://api.exchangerate-api.com/v4/latest/${origem}`, com prazo total de 5000 ms. Busca `rates[destino]`, multiplica pelo valor e arredonda com `toFixed(2)`. Embed público mostra valor original, convertido e taxa.
+Defer público e getJson no mesmo endpoint v4 da [auditoria P2.4](#contratos-externos--p24), 5 s/1 MiB. Valida tabela e taxa própria positiva finita, produto finito e `base` coerente quando informado. Ausência do destino mantém aviso privado; taxa presente null/zero/tipo errado recebe falha de contrato. Cálculo preserva `toFixed(2)` e embed público.
 
-**Erros e limites:** P2.1 exige valor numérico finito e códigos de três letras, sem trim; preserva valores finitos negativos/zero antes aceitos. Taxa deve ser número positivo finito e produto finito; corpos de forma incorreta são recusados. Destino sem taxa gera erro efêmero; HTTP 404 é interpretado como origem inválida; demais falhas/timeout recebem erro efêmero genérico. Esses ramos permanecem privados após defer público, e falha de envio não repete resposta. Atualização e precisão das taxas dependem do serviço externo, `NOT_CONFIRMED` nesta auditoria.
+404 conserva aviso privado de origem inválida; outras falhas HTTP, limite, timeout/cancelamento e dados inesperados recebem erro classificado privado, sem corpo/URL/erro bruto. Falha de envio não repete resposta. Precisão/atualidade, quota e suporte formal do v4 aberto permanecem `NOT_CONFIRMED`; nenhuma migração de API nesta entrega.
 
 ### `/ping`
 
@@ -214,19 +249,19 @@ Falha de geração recebe erro privado sanitizado após defer; falha de envio pr
 
 ### `/question`
 
-**Fonte:** [question.js](../../commands/question.js). **Opções:** `pergunta` — string obrigatória; descrição solicita inglês.
+**Fonte:** [question.js](../../commands/question.js). **Opção:** `pergunta` string obrigatória, não vazia/Unicode válido até 6000; consulta codificada. Idioma inglês é solicitado, sem validação/tradução.
 
-Defere publicamente antes de axios GET via `getJson` em `https://api.stackexchange.com/2.3/search`, com prazo total de 5000 ms, `order=desc`, `sort=activity`, `intitle` codificado e `site=stackoverflow`. Exibe título e link do **primeiro resultado por atividade**, sem buscar o conteúdo da resposta. Não há IA nem resposta automática à pergunta.
+Defer público e getJson no endpoint Stack Exchange descrito na [auditoria P2.4](#contratos-externos--p24), 5 s/1 MiB. Exibe título/link do primeiro resultado por atividade; o campo “Answer link” aponta para a pergunta, sem buscar resposta. Título/link são validados, excesso vira pergunta.txt integral. Wrapper de erro/quota/backoff é interpretado antes de tratar ausência de resultado; pausa por método vale para chamadas seguintes, inclusive se houve dados válidos nesta resposta.
 
-**Erros e limites:** entrada vazia/inválida ou acima de 6000 recebe resposta efêmera imediata, sem defer/HTTP; título e link remotos são validados, resultado acima do limite de título/campo/soma vira pergunta.txt integral; ausência de resultados e exceções/timeout também permanecem efêmeros após defer público. Não há controle de quota/backoff. O campo “Answer link” aponta para a própria pergunta. Idioma inglês é solicitado, sem validação ou tradução.
+Entrada inválida, lista vazia, erros de pedido/acesso, limite, indisponibilidade e dados inesperados mantêm resposta efêmera, inclusive após defer público. Backoff/quota não causam espera ou retry. Corpo/erro bruto não é publicado. Falha de envio permanece fora do catch e não repete resposta.
 
 ### `/repositorys`
 
-**Fonte:** [repositorys.js](../../commands/repositorys.js). **Opções:** `linguagem` — string obrigatória. O nome público é exatamente `repositorys`.
+**Fonte:** [repositorys.js](../../commands/repositorys.js). **Opção:** `linguagem` string obrigatória não vazia/Unicode válido até 6000; nome público `repositorys` preservado.
 
-Defere publicamente antes de axios GET via `getJson` em `https://api.github.com/search/repositories?q=language:${linguagem}&sort=stars&order=desc`, com prazo total de 5000 ms. Seleciona até cinco itens e envia texto público com nome completo, link e estrelas. Ausência de resultados recebe mensagem pública.
+Defer público e getJson/axios na busca GitHub da [auditoria P2.4](#contratos-externos--p24), com consulta codificada, headers explícitos, 5 s/1 MiB. Valida os até cinco resultados exibidos. Lista vazia mantém mensagem de ausência; `incomplete_results: true` informa que a busca pode estar parcial. Texto extenso segue completo em repositorios.txt.
 
-**Erros e limites:** P2.1 valida linguagem não vazia até 6000 e codifica a consulta. Exige items array; valida nome, URL HTTP(S) até 2048 e estrelas inteiras dos cinco itens exibidos. Texto acima de 2000 vira repositorios.txt completo, inclusive mensagem de ausência com linguagem extensa. Não há autenticação/rate limit específico. Falha HTTP/corpo inesperado mantém erro público sanitizado, sem retry de envio. Até cinco resultados é a seleção pública existente, não perda silenciosa de uma lista prometida integral.
+Não há autenticação nova ou paginação adicional. Pedido/acesso recusado, limite e indisponibilidade não viram “sem resultados”; falhas mantêm resposta pública sanitizada. Envio fora do catch, sem retry. Quotas compartilhadas por IP e comportamento remoto permanecem limitações externas.
 
 ### `/servercount`
 
@@ -270,11 +305,11 @@ Resposta é preparada antes de inserir/remover; operações de estado são sínc
 
 ### `/translate`
 
-**Fonte:** [translate.js](../../commands/translate.js). **Opções preservadas:** idioma e texto strings obrigatórias.
+**Fonte:** [translate.js](../../commands/translate.js). **Opções preservadas:** `idioma`/`texto` strings obrigatórias. Builder importado de `discord.js`, dependência direta já declarada, sem adicionar/atualizar pacotes.
 
-Texto não vazio/Unicode bem formado até 6000; idioma com sintaxe de sigla/tag (ex.: pt, pt-BR), codificado junto do texto na URL. Defer público e getJson/axios para endpoint translate.googleapis.com/translate_a/single, prazo 5 s/corpo até 1 MiB. Valida array de segmentos e une todas as traduções textuais em ordem; mantém menção ao usuário. Até 2000 em mensagem, acima em traducao.txt completo (teto 1 MiB), sem cortar emojis/segmentos.
+Texto não vazio/Unicode bem formado até 6000; idioma com sintaxe de sigla/tag (ex.: pt, pt-BR), ambos codificados na consulta. Defer público e getJson/axios no endpoint gtx da [auditoria P2.4](#contratos-externos--p24), 5 s/1 MiB. Valida array e segmentos, concatena todas as traduções em ordem e mantém menção ao usuário. Até 2000 em mensagem; acima, traducao.txt integral até 1 MiB UTF-8.
 
-Entrada inválida recebe aviso privado imediato; estrutura vazia/inesperada, falha HTTP/timeout recebe erro privado sanitizado, inclusive após defer público. Falha de envio fora do catch não provoca retry. Importação direta de @discordjs/builders continua transitiva; não há chave Google Cloud. Formato de idioma não prova suporte e contrato/estabilidade/termos do endpoint continuam `NOT_CONFIRMED` (R16).
+Entrada inválida, tradução vazia/inesperada, pedido/acesso recusado, limite, indisponibilidade, timeout/cancelamento e demais falhas recebem erro privado sanitizado. Falha de envio fora do catch não causa retry. Não há chave Google Cloud; não se atribui contrato/quota da API Cloud ao endpoint gtx. Idiomas, suporte formal, estabilidade/termos e disponibilidade permanecem `NOT_CONFIRMED`; R16 é `MITIGATED`.
 
 ### `/vote`
 

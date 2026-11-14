@@ -1,6 +1,14 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { getJson } = require("../lib/http-client");
+const {
+  getJson,
+  HttpRequestError,
+  pauseStackExchange,
+} = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
 const {
   validText,
   isHttpUrl,
@@ -39,18 +47,66 @@ module.exports = {
         `https://api.stackexchange.com/2.3/search?order=desc&sort=activity&intitle=${encodeURIComponent(
           userQuestion,
         )}&site=stackoverflow`,
+        // Stack Exchange encodes method errors in a JSON wrapper under HTTP 400.
+        // Other HTTP failures must be classified before attempting to parse HTML.
+        { validateStatus: (status) => status === 200 || status === 400 },
       );
-
-      if (!Array.isArray(response.data?.items)) {
-        throw new TypeError("Lista de perguntas inválida.");
+      const data = response.data;
+      if (
+        !data ||
+        typeof data !== "object" ||
+        Array.isArray(data) ||
+        (data.backoff !== undefined &&
+          (!Number.isSafeInteger(data.backoff) ||
+            data.backoff < 0 ||
+            data.backoff > 86400)) ||
+        (data.quota_remaining !== undefined &&
+          (!Number.isSafeInteger(data.quota_remaining) ||
+            data.quota_remaining < 0)) ||
+        (data.error_id !== undefined &&
+          (!Number.isSafeInteger(data.error_id) || data.error_id <= 0)) ||
+        ![data.error_name, data.error_message].every(
+          (value) =>
+            value === undefined || validText(value, MAX_TEXT_ATTACHMENT_BYTES),
+        ) ||
+        (data.error_id === undefined &&
+          (data.error_name !== undefined || data.error_message !== undefined))
+      ) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
-      if (response.data.items.length > 0) {
-        const topResult = response.data.items[0];
+      if (data.backoff !== undefined) pauseStackExchange(data.backoff);
+      if (data.quota_remaining === 0) {
+        // Conservative local pause; this is not the provider's quota reset time.
+        if (!data.backoff) pauseStackExchange(60);
+        throw new HttpRequestError("HTTP_RATE_LIMITED");
+      }
+      if (data.error_id !== undefined) {
+        if (data.error_id === 502) {
+          if (!data.backoff) pauseStackExchange(60);
+          throw new HttpRequestError("HTTP_RATE_LIMITED");
+        }
+        if (data.error_id === 503 || data.error_id === 500) {
+          throw new HttpRequestError("HTTP_STATUS_ERROR", 503);
+        }
+        if ([401, 402, 403, 405, 406].includes(data.error_id)) {
+          throw new HttpRequestError("HTTP_STATUS_ERROR", 403);
+        }
+        throw new HttpRequestError(
+          "HTTP_STATUS_ERROR",
+          response.status === 200 ? 400 : response.status,
+        );
+      }
+      requireSuccessfulResponse(response);
+      if (!Array.isArray(data.items)) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
+      }
+      if (data.items.length > 0) {
+        const topResult = data.items[0];
         if (
           !validText(topResult?.title, MAX_TEXT_ATTACHMENT_BYTES) ||
           !isHttpUrl(topResult.link)
         ) {
-          throw new TypeError("Pergunta inválida.");
+          throw new HttpRequestError("HTTP_INVALID_BODY");
         }
         payload = embedPayload(
           {
@@ -86,10 +142,12 @@ module.exports = {
           ephemeral: true,
         };
       }
-    } catch {
+    } catch (error) {
       payload = {
-        content:
+        content: apiErrorMessage(
+          error,
           "Ocorreu um erro ao buscar perguntas relacionadas. Tente novamente mais tarde.",
+        ),
         ephemeral: true,
       };
     }

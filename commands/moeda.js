@@ -1,6 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { getJson } = require("../lib/http-client");
+const { getJson, HttpRequestError } = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -51,23 +55,24 @@ module.exports = {
 
     try {
       const response = await getJson(url);
+      requireSuccessfulResponse(response);
+      if (response.data?.base !== undefined && response.data.base !== origem) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
+      }
       const taxasDeCambio = response.data?.rates;
       if (
         !taxasDeCambio ||
         typeof taxasDeCambio !== "object" ||
-        Array.isArray(taxasDeCambio)
+        Array.isArray(taxasDeCambio) ||
+        Object.keys(taxasDeCambio).length === 0
       ) {
-        throw new TypeError("Tabela de taxas inválida.");
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
       const taxaDeCambio = Object.hasOwn(taxasDeCambio, destino)
         ? taxasDeCambio[destino]
         : undefined;
 
-      if (
-        taxaDeCambio === undefined ||
-        taxaDeCambio === null ||
-        taxaDeCambio === 0
-      ) {
+      if (taxaDeCambio === undefined) {
         payload = {
           content: "Código de moeda de destino inválido.",
           ephemeral: true,
@@ -79,7 +84,7 @@ module.exports = {
           taxaDeCambio <= 0 ||
           !Number.isFinite(valor * taxaDeCambio)
         ) {
-          throw new TypeError("Taxa de câmbio inválida.");
+          throw new HttpRequestError("HTTP_INVALID_BODY");
         }
         const valorConvertido = (valor * taxaDeCambio).toFixed(2);
 
@@ -120,8 +125,10 @@ module.exports = {
         };
       } else {
         payload = {
-          content:
+          content: apiErrorMessage(
+            error,
             "Ocorreu um erro ao converter as moedas. Por favor, tente novamente mais tarde.",
+          ),
           ephemeral: true,
         };
       }

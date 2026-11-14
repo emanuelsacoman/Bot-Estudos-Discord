@@ -73,6 +73,7 @@ async function execute(name, options, response, interactionOptions) {
   const requests = [];
   const interaction = interactionFor(options, interactionOptions);
   const helperPath = require.resolve("../lib/http-client");
+  const helperExports = require(helperPath);
   const commandPath = require.resolve(`../commands/${name}`);
   const previousHelper = require.cache[helperPath];
   const previousCommand = require.cache[commandPath];
@@ -80,13 +81,20 @@ async function execute(name, options, response, interactionOptions) {
     assert.equal(interaction.deferred, true, "HTTP deve ocorrer após defer.");
     requests.push(url);
     if (response instanceof Error) throw response;
-    return response;
+    return response && typeof response === "object"
+      ? { status: 200, ...response }
+      : response;
   };
   require.cache[helperPath] = {
     id: helperPath,
     filename: helperPath,
     loaded: true,
-    exports: { getJson: request, fetchJson: request },
+    exports: {
+      ...helperExports,
+      getJson: request,
+      fetchJson: request,
+      pauseStackExchange: () => {},
+    },
   };
   delete require.cache[commandPath];
   try {
@@ -277,7 +285,7 @@ for (const segments of [
       { idioma: "pt", texto: "hello" },
       { data: [segments] },
     );
-    assert.match(payload.content, /erro ao traduzir/);
+    assert.match(payload.content, /resposta inválida/);
     assert.ok(payload.flags & 64);
   });
 }
@@ -361,7 +369,7 @@ for (const items of [
       { linguagem: "JS" },
       { data: { items } },
     );
-    assert.match(payload.content ?? payload, /erro ao buscar/);
+    assert.match(payload.content ?? payload, /resposta inválida/);
   });
 }
 

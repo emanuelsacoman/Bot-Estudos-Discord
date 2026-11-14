@@ -236,6 +236,7 @@ async function withCommand(
 ) {
   const commandPath = require.resolve(`../commands/${name}`);
   const httpPath = require.resolve("../lib/http-client");
+  const helperExports = require(httpPath);
   const statusPath = require.resolve("../lib/status-http");
   const previous = new Map(
     [commandPath, httpPath, statusPath].map((filename) => [
@@ -246,7 +247,18 @@ async function withCommand(
   const installMock = (filename, exports) => {
     require.cache[filename] = { id: filename, filename, loaded: true, exports };
   };
-  installMock(httpPath, { getJson: request, fetchJson: request });
+  const requestWithStatus = async (...args) => {
+    const response = await request(...args);
+    return response && typeof response === "object"
+      ? { status: 200, ...response }
+      : response;
+  };
+  installMock(httpPath, {
+    ...helperExports,
+    getJson: requestWithStatus,
+    fetchJson: requestWithStatus,
+    pauseStackExchange: () => {},
+  });
   if (!realStatusChecker) installMock(statusPath, { checkStatus: request });
   delete require.cache[commandPath];
   try {
@@ -359,7 +371,7 @@ for (const scenario of scenarios) {
         async (_url, options) => {
           if (scenario.name === "github") return { status, data: {} };
           if (scenario.name === "http") {
-            assert.equal(options.validateStatus(status), true);
+            assert.equal(options.validateStatus(status), false);
             return {
               status,
               data: { code: status, description: "Resposta simulada" },
@@ -373,14 +385,19 @@ for (const scenario of scenarios) {
         },
         async (command) => command.execute(interaction),
       );
-      const publicStatus = ["github", "http", "status"].includes(scenario.name);
+      const publicStatus = ["github", "status"].includes(scenario.name);
       const payload = assertResponse(
         interaction,
         publicStatus ? false : scenario.failurePrivate,
       );
       assert.doesNotMatch(JSON.stringify(payload), /corpo-remoto-sentinela/);
       if (scenario.name === "github")
-        assert.equal(payload.content ?? payload, "Repositório não encontrado.");
+        assert.equal(
+          payload.content ?? payload,
+          status === 404
+            ? "Repositório não encontrado."
+            : "O serviço está indisponível no momento. Tente novamente mais tarde.",
+        );
       if (scenario.name === "moeda" && status === 404) {
         assert.equal(payload.content, "Código de moeda de origem inválido.");
       }

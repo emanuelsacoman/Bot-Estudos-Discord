@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { getJson } = require("../lib/http-client");
+const { getJson, HttpRequestError } = require("../lib/http-client");
+const { apiErrorMessage } = require("../lib/api-errors");
 const {
   validText,
   embedPayload,
@@ -48,15 +49,23 @@ module.exports = {
 
     try {
       const response = await getJson(`https://httpstat.us/${code}?json`, {
-        validateStatus: () => true,
+        validateStatus: (status) => status === code,
+        headers: { Accept: "application/json" },
       });
 
       const data = response.data;
+      if (response.status !== code) {
+        throw new HttpRequestError(
+          Number.isInteger(response.status)
+            ? "HTTP_STATUS_ERROR"
+            : "HTTP_INVALID_BODY",
+          response.status,
+        );
+      }
 
       if (
         !Number.isInteger(data?.code) ||
-        data.code < 100 ||
-        data.code > 599 ||
+        data.code !== code ||
         !validText(data.description, MAX_TEXT_ATTACHMENT_BYTES)
       ) {
         payload = {
@@ -99,10 +108,12 @@ module.exports = {
           "codigo-http.txt",
         );
       }
-    } catch {
+    } catch (error) {
       payload = {
-        content:
+        content: apiErrorMessage(
+          error,
           "Ocorreu um erro ao buscar o código HTTP. Verifique se o código está correto.",
+        ),
         ephemeral: true,
       };
     }

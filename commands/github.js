@@ -1,6 +1,10 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { fetchJson } = require("../lib/http-client");
+const { fetchJson, HttpRequestError } = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
 const {
   validText,
   isHttpUrl,
@@ -38,81 +42,91 @@ module.exports = {
     let payload;
 
     try {
-      const { status, data } = await fetchJson(
+      const response = await fetchJson(
         `https://api.github.com/repos/${repository.split("/").map(encodeURIComponent).join("/")}`,
-      );
-
-      if (status === 200) {
-        if (
-          !validText(data?.owner?.login, MAX_TEXT_ATTACHMENT_BYTES) ||
-          !validText(data.full_name, MAX_TEXT_ATTACHMENT_BYTES) ||
-          !isHttpUrl(data.html_url) ||
-          !isHttpUrl(data.owner.avatar_url) ||
-          ![data.stargazers_count, data.forks_count].every(
-            (value) => Number.isSafeInteger(value) && value >= 0,
-          ) ||
-          ![data.description, data.language].every(
-            (value) =>
-              value == null ||
-              value === "" ||
-              validText(value, MAX_TEXT_ATTACHMENT_BYTES),
-          )
-        ) {
-          throw new TypeError("Resposta de repositório inválida.");
-        }
-        payload = embedPayload(
-          {
-            color: 0x3498db,
-            author: {
-              name: data.owner.login,
-              icon_url: data.owner.avatar_url,
-              url: data.html_url,
-            },
-            title: `Repositório de ${data.owner.login}`,
-            thumbnail: { url: data.owner.avatar_url },
-            fields: [
-              {
-                name: "Full Name 🤓",
-                value: data.full_name,
-                inline: true,
-              },
-              {
-                name: "Description 🌎",
-                value: data.description || "Sem descrição disponível.",
-                inline: true,
-              },
-              { name: "\u200B", value: "\u200B" },
-              {
-                name: "Language ‍💻",
-                value: data.language || "Não especificada",
-                inline: true,
-              },
-              {
-                name: "Stars ⭐",
-                value: `${data.stargazers_count}`,
-                inline: true,
-              },
-              {
-                name: "Forks 🍴",
-                value: `${data.forks_count}`,
-                inline: true,
-              },
-              { name: "URL", value: data.html_url },
-            ],
-            url: data.html_url,
-            footer: {
-              text: "CodeBucket",
-              icon_url: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
-            },
-            timestamp: new Date().toISOString(),
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            "User-Agent": "CodeBucket",
+            "X-GitHub-Api-Version": "2022-11-28",
           },
-          "repositorio.txt",
-        );
-      } else {
-        payload = "Repositório não encontrado.";
+        },
+      );
+      requireSuccessfulResponse(response);
+      const { data } = response;
+      if (
+        !validText(data?.owner?.login, MAX_TEXT_ATTACHMENT_BYTES) ||
+        !validText(data.full_name, MAX_TEXT_ATTACHMENT_BYTES) ||
+        !isHttpUrl(data.html_url) ||
+        !isHttpUrl(data.owner.avatar_url) ||
+        ![data.stargazers_count, data.forks_count].every(
+          (value) => Number.isSafeInteger(value) && value >= 0,
+        ) ||
+        ![data.description, data.language].every(
+          (value) =>
+            value == null ||
+            value === "" ||
+            validText(value, MAX_TEXT_ATTACHMENT_BYTES),
+        )
+      ) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
-    } catch {
-      payload = "Ocorreu um erro ao buscar informações do repositório.";
+      payload = embedPayload(
+        {
+          color: 0x3498db,
+          author: {
+            name: data.owner.login,
+            icon_url: data.owner.avatar_url,
+            url: data.html_url,
+          },
+          title: `Repositório de ${data.owner.login}`,
+          thumbnail: { url: data.owner.avatar_url },
+          fields: [
+            {
+              name: "Full Name 🤓",
+              value: data.full_name,
+              inline: true,
+            },
+            {
+              name: "Description 🌎",
+              value: data.description || "Sem descrição disponível.",
+              inline: true,
+            },
+            { name: "\u200B", value: "\u200B" },
+            {
+              name: "Language ‍💻",
+              value: data.language || "Não especificada",
+              inline: true,
+            },
+            {
+              name: "Stars ⭐",
+              value: `${data.stargazers_count}`,
+              inline: true,
+            },
+            {
+              name: "Forks 🍴",
+              value: `${data.forks_count}`,
+              inline: true,
+            },
+            { name: "URL", value: data.html_url },
+          ],
+          url: data.html_url,
+          footer: {
+            text: "CodeBucket",
+            icon_url: "https://cdn-icons-png.flaticon.com/512/190/190544.png",
+          },
+          timestamp: new Date().toISOString(),
+        },
+        "repositorio.txt",
+      );
+    } catch (error) {
+      payload =
+        error?.response?.status === 404
+          ? "Repositório não encontrado."
+          : apiErrorMessage(
+              error,
+              "Ocorreu um erro ao buscar informações do repositório.",
+            );
     }
     return respond(interaction, payload);
   },

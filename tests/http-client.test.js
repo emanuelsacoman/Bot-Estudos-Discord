@@ -140,7 +140,7 @@ test("getJson cancela transporte que não termina no prazo", async () => {
   assert.equal(signal.aborted, true);
 });
 
-test("fetchJson entrega status e JSON usando AbortSignal", async (t) => {
+test("fetchJson entrega JSON de sucesso e sanitiza falhas usando AbortSignal", async (t) => {
   for (const status of [200, 404, 500]) {
     await t.test(String(status), async () => {
       const calls = [];
@@ -152,10 +152,22 @@ test("fetchJson entrega status e JSON usando AbortSignal", async (t) => {
           });
         },
       });
-      assert.deepEqual(await client.fetchJson("https://example.com"), {
-        status,
-        data: { message: "controlled" },
-      });
+      if (status === 200) {
+        assert.deepEqual(await client.fetchJson("https://example.com"), {
+          status,
+          data: { message: "controlled" },
+        });
+      } else {
+        await assert.rejects(
+          client.fetchJson("https://example.com"),
+          (error) => {
+            isSafeHttpError(error);
+            assert.equal(error.code, "HTTP_STATUS_ERROR");
+            assert.equal(error.response.status, status);
+            return true;
+          },
+        );
+      }
       assert.equal(calls.length, 1);
       assert.ok(calls[0].options.signal instanceof AbortSignal);
       assert.equal(calls[0].options.signal.aborted, false);

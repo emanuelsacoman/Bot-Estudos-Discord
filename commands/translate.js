@@ -1,6 +1,10 @@
-const { SlashCommandBuilder } = require("@discordjs/builders");
+const { SlashCommandBuilder } = require("discord.js");
 const { deferResponse, respond } = require("../lib/interactions");
-const { getJson } = require("../lib/http-client");
+const { getJson, HttpRequestError } = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
 const {
   validText,
   textPayload,
@@ -45,9 +49,11 @@ module.exports = {
       const response = await getJson(
         `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(idioma)}&dt=t&q=${encodeURIComponent(texto)}`,
       );
+      requireSuccessfulResponse(response);
 
       const segments = response.data?.[0];
       if (
+        !Array.isArray(response.data) ||
         !Array.isArray(segments) ||
         segments.length === 0 ||
         !segments.every(
@@ -57,19 +63,19 @@ module.exports = {
             segment[0].isWellFormed(),
         )
       ) {
-        throw new TypeError("Resposta de tradução inválida.");
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
       const traducao = segments.map((segment) => segment[0]).join("");
       if (!validText(traducao, MAX_TEXT_ATTACHMENT_BYTES)) {
-        throw new TypeError("Resposta de tradução vazia ou excessiva.");
+        throw new HttpRequestError("HTTP_INVALID_BODY");
       }
 
       const textoTraduzido = `🗺️ | <@${interaction.user.id}>\n${traducao}`;
 
       payload = textPayload(textoTraduzido, "traducao.txt");
-    } catch {
+    } catch (error) {
       payload = {
-        content: "Ocorreu um erro ao traduzir o texto.",
+        content: apiErrorMessage(error, "Ocorreu um erro ao traduzir o texto."),
         ephemeral: true,
       };
     }

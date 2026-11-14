@@ -70,7 +70,7 @@ test("orçamento HTTP é 1 MiB e não pode ser aumentado pelas opções axios", 
     axiosGet: async (_url, options) => {
       assert.equal(options.maxContentLength, HTTP_MAX_BODY_BYTES);
       assert.equal(options.maxBodyLength, HTTP_MAX_BODY_BYTES);
-      assert.equal(options.responseType, "json");
+      assert.equal(options.responseType, "arraybuffer");
       return { status: 200, data: {} };
     },
   });
