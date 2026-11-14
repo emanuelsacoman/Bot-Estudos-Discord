@@ -274,6 +274,158 @@ test("ready e cooldowns usam handles rastreados e cleanup remove timers e listen
   assert.deepEqual(client.eventNames(), [Events.Error]);
 });
 
+function privateGuild() {
+  return Object.defineProperties(
+    {},
+    {
+      name: {
+        get: () => assert.fail("nome individual de servidor não deve ser lido"),
+      },
+      id: {
+        get: () => assert.fail("ID individual de servidor não deve ser lido"),
+      },
+      memberCount: {
+        get: () =>
+          assert.fail("quantidade individual de membros não deve ser lida"),
+      },
+    },
+  );
+}
+
+function clientWithPrivateGuilds(count = 2) {
+  const client = fakeClient();
+  for (let index = 0; index < count; index++) {
+    client.guilds.cache.set(`SENSITIVE_GUILD_ID_${index}`, privateGuild());
+  }
+  client.guilds.cache.forEach = () =>
+    assert.fail("ready não deve enumerar servidores");
+  Object.defineProperty(client.user, "tag", {
+    get: () => assert.fail("tag do bot não é necessária ao diagnóstico"),
+  });
+  return client;
+}
+
+for (const count of [0, 2]) {
+  test(`ready registra confirmação e total agregado de ${count} servidores`, (t) => {
+    const timers = simulatedTimers(t);
+    const printed = [];
+    t.mock.method(console, "log", (...args) => printed.push(args));
+    const { configureClient } = require("../index");
+    const client = clientWithPrivateGuilds(count);
+    const cleanup = configureClient(client, catalog());
+    t.after(cleanup);
+    assert.doesNotThrow(() => client.emit("ready"));
+    assert.deepEqual(printed, [
+      ["Pronto! Login realizado."],
+      [`O bot está conectado em um total de ${count} servidores.`],
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(printed),
+      /SENSITIVE_GUILD|controlled#|Membros|Nome do servidor/,
+    );
+    assert.equal(timers.active.size, 1);
+  });
+}
+
+test("guildCreate registra somente evento genérico e total agregado", (t) => {
+  simulatedTimers(t);
+  const printed = [];
+  t.mock.method(console, "log", (...args) => printed.push(args));
+  for (const method of ["toLocaleDateString", "toLocaleTimeString"]) {
+    t.mock.method(Date.prototype, method, () =>
+      assert.fail("o evento não precisa calcular data/hora para logging"),
+    );
+  }
+  const { configureClient } = require("../index");
+  const client = clientWithPrivateGuilds();
+  const cleanup = configureClient(client, catalog());
+  t.after(cleanup);
+  assert.doesNotThrow(() => client.emit("guildCreate", privateGuild()));
+  assert.deepEqual(printed, [
+    ["O bot foi adicionado a um servidor."],
+    ["O bot está conectado em um total de 2 servidores."],
+  ]);
+});
+
+for (const [name, count] of [
+  ["ausente", undefined],
+  ["negativa", -1],
+  ["fracionária", 1.5],
+  ["NaN", NaN],
+  ["infinita", Infinity],
+  ["texto", "SENSITIVE_COUNT"],
+  [
+    "objeto",
+    {
+      toString: () =>
+        assert.fail("contagem não deve ser convertida para string"),
+    },
+  ],
+]) {
+  test(`eventos omitem contagem ${name} sem publicar valor`, (t) => {
+    const timers = simulatedTimers(t);
+    const printed = [];
+    t.mock.method(console, "log", (...args) => printed.push(args));
+    const { configureClient } = require("../index");
+    const client = fakeClient();
+    client.guilds.cache = { size: count };
+    const cleanup = configureClient(client, catalog());
+    t.after(cleanup);
+    assert.doesNotThrow(() => client.emit("ready"));
+    assert.doesNotThrow(() => client.emit("guildCreate", privateGuild()));
+    assert.deepEqual(printed, [
+      ["Pronto! Login realizado."],
+      ["O bot foi adicionado a um servidor."],
+    ]);
+    assert.equal(timers.active.size, 1);
+  });
+}
+
+for (const failure of ["throw", "reject"]) {
+  test(`falha de console ${failure} não impede presença, erros seguros ou cleanup`, async (t) => {
+    const timers = simulatedTimers(t);
+    const attempts = [];
+    const unhandled = [];
+    const onUnhandled = (error) => unhandled.push(error);
+    process.on("unhandledRejection", onUnhandled);
+    t.after(() => process.off("unhandledRejection", onUnhandled));
+    for (const level of ["log", "warn", "error"]) {
+      t.mock.method(console, level, (...args) => {
+        attempts.push({ level, args });
+        if (failure === "throw") throw new Error("SENSITIVE_CONSOLE_SENTINEL");
+        return Promise.reject(new Error("SENSITIVE_CONSOLE_SENTINEL"));
+      });
+    }
+    const { configureClient } = require("../index");
+    const client = clientWithPrivateGuilds();
+    let activities = 0;
+    client.user.setActivity = async () => {
+      activities++;
+      throw new Error("SENSITIVE_ACTIVITY_SENTINEL");
+    };
+    const cleanup = configureClient(client, catalog());
+    t.after(cleanup);
+    assert.doesNotThrow(() => client.emit("ready"));
+    assert.doesNotThrow(() => client.emit("guildCreate", privateGuild()));
+    assert.doesNotThrow(() =>
+      client.emit(Events.Error, new Error("SENSITIVE_DISCORD_SENTINEL")),
+    );
+    const interval = [...timers.active.values()].find(
+      (handle) => handle.type === "interval",
+    );
+    assert.ok(interval);
+    await assert.doesNotReject(timers.fire(interval));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(activities, 1);
+    assert.equal(attempts.length, 6);
+    assert.doesNotMatch(JSON.stringify(attempts), /SENSITIVE|controlled#/);
+    assert.deepEqual(unhandled, []);
+    cleanup();
+    assert.equal(timers.active.size, 0);
+    assert.deepEqual(client.eventNames(), [Events.Error]);
+  });
+}
+
 test("cleanup idempotente mantém só listener de erro sanitizado para eventos tardios", async (t) => {
   const timers = simulatedTimers(t);
   const printed = [];

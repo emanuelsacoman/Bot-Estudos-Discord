@@ -1,4 +1,5 @@
 const { startBot } = require("./lib/startup");
+const { safeLog } = require("./lib/logging");
 
 function configureClient(client, catalog) {
   const { Events, Collection, ActivityType } = require("discord.js");
@@ -12,7 +13,8 @@ function configureClient(client, catalog) {
   } = require("./lib/documentation-interactions");
   const cooldowns = new Collection();
   const cooldownHandles = new Set();
-  const onClientError = () => console.error("Erro de conexão com o Discord.");
+  const onClientError = () =>
+    safeLog("error", "Erro de conexão com o Discord.");
   let presenceInterval;
   client.commands = new Collection(
     catalog.commands.map((command) => [command.data.name, command]),
@@ -134,21 +136,20 @@ function configureClient(client, catalog) {
     },
   ];
 
-  // Login do bot
-  client.once("ready", () => {
-    console.log(`Pronto! Login realizado como ${client.user.tag}\n`);
-    console.log(`${client.user.tag} foi iniciado em:`);
-
-    client.guilds.cache.forEach((guild) => {
-      console.log(
-        `Nome do servidor: ${guild.name} | ID: ${guild.id} | Membros: ${guild.memberCount}`,
+  const logServerCount = () => {
+    const count = client.guilds.cache.size;
+    if (Number.isSafeInteger(count) && count >= 0) {
+      safeLog(
+        "log",
+        `O bot está conectado em um total de ${count} servidores.`,
       );
-    });
+    }
+  };
 
-    console.log(
-      `O bot está conectado em um total de ${client.guilds.cache.size} servidores.`,
-    );
-    console.log("\n");
+  // Only aggregate operational information is logged, without guild/user data.
+  client.once("ready", () => {
+    safeLog("log", "Pronto! Login realizado.");
+    logServerCount();
 
     //status personalizado
     presenceInterval = setInterval(
@@ -161,29 +162,9 @@ function configureClient(client, catalog) {
     );
   });
 
-  //avisa se alguém adicionar o bot
-  client.on("guildCreate", (guild) => {
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString("pt-BR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const formattedTime = now.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    console.log(
-      `O bot foi adicionado ao servidor: ${guild.name} (ID: ${guild.id})`,
-    );
-    console.log(`Data: ${formattedDate}`);
-    console.log(`Hora: ${formattedTime}`);
-    console.log(
-      `O bot está conectado em um total de ${client.guilds.cache.size} servidores.`,
-    );
-    console.log("\n");
+  client.on("guildCreate", () => {
+    safeLog("log", "O bot foi adicionado a um servidor.");
+    logServerCount();
   });
   client.on(Events.Error, onClientError);
 
@@ -198,7 +179,7 @@ function configureClient(client, catalog) {
       if (interaction?.isCommand?.()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) {
-          console.error("Comando não encontrado");
+          safeLog("error", "Comando não encontrado");
           return;
         }
 
