@@ -1,6 +1,6 @@
 # Operação e recuperação
 
-Atualizado na **P2.4 — R16, 2026-11-13**, base `develop/da6a413` (P2.3 já commitada). Evidências históricas e validação atual em [QUALITY_GATES](QUALITY_GATES.md). O [ADR 0003](decisions/0003-estado-operacional-temporario.md) mantém estado operacional em memória e perda após reinício aceita. P2.4 não muda dependências, credenciais ou infraestrutura; trata contratos/falhas e pausas temporárias das APIs, sem retry. Node 24.22.2/npm 11.19.1; login/PUT reais, hospedagem e recuperação continuam `NOT_CONFIRMED`. Os exemplos usam PowerShell a partir da raiz.
+Atualizado na **P2.5 — R03, 2026-11-13**, base `develop/b76219d` (P2.4 já commitada). Evidências históricas e validação atual em [QUALITY_GATES](QUALITY_GATES.md). O [ADR 0003](decisions/0003-estado-operacional-temporario.md) mantém estado operacional em memória e perda após reinício aceita. P2.4 tratou contratos/falhas e pausas temporárias das APIs, sem retry. P2.5 revisa a confiança no carregamento e preserva código, testes, dependências, credenciais e infraestrutura; os gates executados estão registrados em qualidade: baseline/final 1097/1097, sintaxe 59/59, 23 contratos/hash preservados e 28 probes de importação aprovados. Node 24.22.2/npm 11.19.1; login/PUT reais, hospedagem e recuperação continuam `NOT_CONFIRMED`. Os exemplos usam PowerShell a partir da raiz.
 
 ## Preparar Node.js e dependências
 
@@ -54,6 +54,20 @@ Os testes usaram diretórios inicialmente sem `node_modules`/`.env`: `node_modul
 Na P2.4, duas novas cópias isoladas em `node_modules/.codebucket-p24/ci-development` e `ci-production` receberam instalações limpas offline em 2026-11-08: **85 pacotes/exit 0** em cada, sem mudar manifest/lock. Em 2026-11-13, ambas passaram na importação/serialização dos **23 contratos**, hash público preservado e execução de `/translate` com Unicode e resposta simulada; o resolver recusou dependências fora de cada cópia. Isso comprova a troca do import pela dependência direta nos dois modos, sem comprovar operação do endpoint real. Detalhes em [qualidade](QUALITY_GATES.md).
 
 Em P1.1, as duas variantes passaram novamente em `node_modules/.codebucket-p1/ci-development` e `ci-production`, com `--offline` e os caches P0 já preenchidos. `npm test` executa a suíte offline sem precisar de `.env`; P1.3 acrescenta casos de configuração, inicialização, registro e timers. Instruções/resultados em [qualidade](QUALITY_GATES.md). Distribua todo `lib/`: runtime, comandos e registro dependem dos módulos locais de configuração, catálogo, ciclo de vida, respostas, HTTP e timers. P1.2/P1.3/P2.1 não adicionam dependências. P2.1 acrescenta content-limits/todo-store e amplia o helper HTTP; distribua todos os helpers. QR e fallbacks de texto não exigem diretório gravável.
+
+## Revisar módulos locais antes de carregar — P2.5
+
+O catálogo executa JavaScript confiável do checkout. Importar um módulo ou chamar seu toJSON não é uma operação de sandbox; o catálogo valida o contrato resultante e falha de forma sanitizada, mas não desfaz o que o código já executou. A revisão P2.5 não encontrou correção adicional justificada para os 23 comandos presentes; R03 permanece `MITIGATED`. Inventário e limitações estão na [arquitetura](ARCHITECTURE.md#confiança-e-efeitos-na-importação--p25).
+
+Antes de aceitar um módulo ou mudança de dependência, em tarefa autorizada:
+
+1. Conferir origem/diff do código e caminhos de require/import, inclusive dependências transitivas e symlinks. Não carregar módulos ou executar código enviados por usuários do Discord; entradas dos comandos não devem virar caminhos de módulo.
+2. Separar inicialização estática de rede, credenciais, escrita/exclusão, timers, listeners globais, processos filhos e trabalho assíncrono no topo. Preservar funções de inicialização/execute explícitas. Prettier inicia import ESM local, tslib publica helpers globais e a pilha Undici prepara dispatchers globais ociosos; esses efeitos transitivos conhecidos não equivalem a operação remota nem a autorização para carregar código desconhecido.
+3. Preservar catálogo compartilhado, ordenação determinística, data/execute e validação integral. Um módulo inválido deve bloquear a preparação inteira antes de Client/login ou REST/PUT; não remover arquivos ou contornar o validador para obter um conjunto parcial.
+4. Executar os gates offline pertinentes e comparar os 23 contratos/hash. Instalação, atualização de pacotes, execução das entradas ou operações remotas exigem o escopo correspondente; a auditoria de um require não as autoriza automaticamente.
+5. Não introduzir sandbox, workers, containers ou infraestrutura para isolar código já autorizado no repositório sem requisito concreto. Integridade de checkout/instalação e revisão continuam controles necessários; os probes offline pontuais não garantem isolamento contra módulos maliciosos.
+
+Essa política não muda Node 24, CommonJS, memória temporária, limites ou a arquitetura de um processo. Não requer banco/disco durável ou serviços adicionais para hospedagem gratuita, cuja compatibilidade operacional continua `NOT_CONFIRMED`.
 
 ## Configurar ambiente e autenticação
 
@@ -159,7 +173,7 @@ Runtime LTS, instalações limpas normal/produção e contratos offline foram va
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P2.3 está commitada em `da6a413` e a P2.4 permanece local sem commit.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P2.4 está commitada em `b76219d` e a atualização documental P2.5 permanece local sem commit.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.
