@@ -1,8 +1,18 @@
 # Estado atual do projeto
 
-Atualizado na **P3.2 — R12, 2026-11-23**, America/Sao_Paulo. Base **develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18**, árvore inicialmente limpa; P3.1 já commitada (a indicação anterior de entrega local estava desatualizada). P3.2 local sem commit/push; sem fetch ou operação remota. Registros anteriores abaixo são históricos; evidências atuais em [QUALITY_GATES](QUALITY_GATES.md).
+Atualizado na **P3.3 — preparação operacional, 2026-11-23**, America/Sao_Paulo. Base **develop/9d1b8639bfc629a69a6f464bf05cf8ec1fad7401**, árvore inicialmente limpa. P3.2 commitada e enviada: comparação GitHub somente leitura contra develop remoto retornou identical/0 ahead/0 behind. Nenhuma escrita remota ou atualização automática do checkout. P3.3 IN_PROGRESS, com gates offline executados e conexão bloqueada pela configuração pública pendente; trabalho local sem commit/push. Registros anteriores abaixo são históricos; evidências atuais em [QUALITY_GATES](QUALITY_GATES.md).
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
+
+## Pré-conexão P3.3 — estado comprovado
+
+| Área | Resultado atual |
+| --- | --- |
+| Runtime/offline | Node 24.22.2/npm 11.19.1 independentes disponíveis; PowerShell 5.1.19041.6456. Suíte 1266/1266, sintaxe 63/63, contratos 23/23/hash P0 preservados, dry-run exit 0/23 e 85 versões iguais ao lock. Não se repetiu instalação limpa porque manifest/lock/dependências não mudaram; instalações P3.2 são históricas. |
+| Configuração | TOKEN/CLIENT_ID/LOFIRADIO_URL estruturalmente válidos; INVITE_URL inválida impede configuração completa. .env preservado e sem exposição de valores. Usuário adiou ajuste manual. Nenhum override aplicado ao processo do bot. |
+| Discord/permissões | Login não autorizado/não executado; 0/23 comandos testados remotamente, nenhuma permissão validada. R12 MITIGATED; associação TOKEN/CLIENT_ID, comandos remotos, links, DM/threads e hospedagem NOT_CONFIRMED. Roteiro individual em OPERATIONS. |
+| Instância única | Não iniciada nesta tarefa. WMI de command lines recusado por acesso negado; cinco processos Node visíveis não foram atribuídos nem encerrados. Conferir concorrência antes da autorização/execução futura. |
+| Próxima ação | Responsável deixa INVITE_URL= vazia e avisa; repetir validação efetiva. Somente após configuração aprovada, solicitar consentimento explícito para uma instância local. Sem autorização para registro global/deploy/permissões/credenciais. |
 
 ## Identidade e escopo comprovados
 

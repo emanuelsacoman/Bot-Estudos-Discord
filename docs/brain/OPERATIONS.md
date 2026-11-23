@@ -1,5 +1,61 @@
 # Operação e recuperação
 
+## P3.3 — preparação offline e checkpoint antes do login
+
+Atualizado em **2026-11-23**, America/Sao_Paulo, base **develop/9d1b863**, inicialmente limpa. A P3.2 está commitada e enviada: a comparação GitHub confirmou o mesmo commit no checkout e em `develop`, **ahead 0 / behind 0**. Uma clonagem dessa revisão inclui a P3.2; a atualização P3.3 é local e não implica commit/push novo. Os resultados anteriores abaixo permanecem registros históricos.
+
+**Gates offline executados na P3.3:** suíte **1266/1266**, sintaxe **63/63**, **23 contratos** e hash slash iguais a HEAD/P0, **85 versões** de dependências conferidas e dry-run **23 comandos/exit 0**. Nenhum login Discord, teste real de comando, consulta a APIs dos comandos, registro global, deploy, reinício ou alteração remota foi realizado. Esses gates não comprovam token válido, associação com a aplicação, permissões efetivas ou disponibilidade externa. Evidências e limitações em [QUALITY_GATES](QUALITY_GATES.md).
+
+**Checkpoint operacional: BLOCKED pela configuração local.** A nova validação sanitizada encontrou TOKEN, CLIENT_ID e LOFIRADIO_URL individualmente válidos estruturalmente, mas `INVITE_URL` continua recusada. O usuário escolheu **“Vou ajustar depois”** para o ajuste manual `INVITE_URL=`. Portanto `.env` e credenciais foram preservados; não se aplicou override temporário para executar o bot. O ajuste foi adiado e o fluxo encerra neste checkpoint, antes de solicitar autorização de login. Esta preparação offline não é autorização de conexão.
+
+Para retomar, o responsável deve deixar `INVITE_URL=` vazia em editor local, preservando TOKEN/CLIENT_ID, e repetir a validação estrutural sem exibir valores. Depois, confirmar a aplicação e o ambiente do ensaio. Somente com a configuração aprovada e autorização específica posterior pode haver login e execução real dos passos abaixo. Não pedir/reutilizar autorização de registro global como se fosse autorização de login; os escopos são separados.
+
+### Processo único e encerramento do ensaio futuro
+
+A existência de outra instância **não está confirmada**: a consulta WMI foi negada neste ambiente. A ausência de evidência local não demonstra ausência de processo em outro terminal, serviço ou hospedagem. Nenhum processo do bot foi iniciado por esta P3.3. Antes do ensaio autorizado, identificar o processo e terminal próprios e confirmar com o responsável se já existe uma instância; não interromper produção ou encerrar todos os processos Node.
+
+O código não tem trava de instância ou sincronização. Duas instâncias podem disputar respostas às mesmas interações, enquanto todo, timers, cooldowns e pausas de APIs ficam independentes em cada memória. Usar uma única instância no escopo confirmado. Se não for possível esclarecer a existência de outra instância, manter o login pendente em vez de iniciar por tentativa.
+
+No ensaio futuro autorizado, usar o runtime validado e executar **em primeiro plano no terminal de origem**, a partir da raiz, `& $nodeRuntime index.js`. Não iniciar em segundo plano nem registrar comandos para diagnosticar conexão. Observar o pronto e os resultados do checklist; ao terminar, usar `Ctrl+C` nesse mesmo terminal e confirmar que o processo específico encerrou. Não há handler geral de desligamento gracioso SIGINT/SIGTERM; parar perde estado temporário pelo ADR 0003. O cleanup limitado do bootstrap trata falha de inicialização e não equivale a um mecanismo geral de parada. Não encerrar instância anterior nem repetir login automaticamente após uma falha.
+
+### Roteiro individual dos 23 comandos — NOT_EXECUTED
+
+Todos os itens seguintes são **planejados**, sem resultado real. Usar canal/servidor de teste controlado e entradas sem dados pessoais; aguardar mais de cinco segundos entre chamadas do mesmo comando, inclusive subcomandos. As saídas públicas abaixo são as esperadas no caminho normal; falhas sanitizadas, quotas e indisponibilidade devem ser registradas como observadas, sem loops de retry. Não abrir destinos, concluir instalações ou efetuar voto só para conferir um botão.
+
+As entradas indicam os **valores do contrato**. Em `/formatar`, `linguagem:babel` corresponde à escolha visual **JavaScript** no cliente Discord; `markdown` corresponde a Markdown. As permissões da [matriz](COMMANDS.md#matriz-de-recursos-e-permissões--p32) são requisitos esperados, ainda **NOT_CONFIRMED**: convite com scopes `bot applications.commands` e bitfield 117824 não comprova cargos/sobrescritas do canal. DM e threads precisam de ensaio específico quando incluídos no escopo; não ampliar intents nem conceder Administrator por conveniência.
+
+| Comando | Entrada segura planejada | Resultado esperado pelo código | Execução real |
+| --- | --- | --- | --- |
+| `/autor` | Sem opções | Embed público, botão GitHub e três reações Unicode | NOT_EXECUTED |
+| `/count` | `texto:abc 123` | Embed público: 7 caracteres, 2 palavras, 3 letras e 3 números | NOT_EXECUTED |
+| `/docs` | Sem opções; selecionar JavaScript no menu novo | Embed/menu público; seleção responde link da documentação | NOT_EXECUTED |
+| `/exercise` | `linguagem:javascript` | Embed público com um exercício aleatório da linguagem | NOT_EXECUTED |
+| `/formatar` | `linguagem:babel`, `codigo:const x={a:1}` | Embed público com código formatado, sem executar o código; anexo no caso complementar abaixo | NOT_EXECUTED |
+| `/git` | Sem opções | Embed público com referências Git; nenhum comando Git é executado | NOT_EXECUTED |
+| `/github` | `repositorio:nodejs/node` | Embed público do repositório; falha pública sanitizada se a consulta não concluir | NOT_EXECUTED |
+| `/help` | Sem opções | Embed público listando os 23 comandos locais | NOT_EXECUTED |
+| `/http` | Primeiro `codigo:100`; depois, se incluída consulta externa, `codigo:200` | Embed público local para 100; resultado público ou falha efêmera sanitizada para consulta 200 | NOT_EXECUTED |
+| `/invite` | Sem opções | Embed/botão público e coração; conferir ID da aplicação, scopes e 117824 sem concluir instalação; divergência gera aviso efêmero sem botão | NOT_EXECUTED |
+| `/lofiradio` | Sem opções | Embed/botão público e dois anexos locais (thumbnail/imagem); sem áudio ou voz | NOT_EXECUTED |
+| `/moeda` | `valor:1`, `origem:USD`, `destino:BRL` | Embed público com resultado recebido; falha efêmera sanitizada | NOT_EXECUTED |
+| `/ping` | Sem opções | Texto efêmero, editado com a latência da resposta inicial | NOT_EXECUTED |
+| `/playlist` | Sem opções | Embed e follow-up público com link Spotify; reação Unicode no follow-up | NOT_EXECUTED |
+| `/qrcode` | `link:https://lofiradio.web.app` | Embed público e PNG anexado, sem consultar o endereço informado | NOT_EXECUTED |
+| `/question` | `pergunta:javascript array map` | Embed público se encontrado; ausência ou falha efêmera sanitizada | NOT_EXECUTED |
+| `/repositorys` | `linguagem:javascript` | Lista pública de até cinco repositórios; ausência/falha pública sanitizada | NOT_EXECUTED |
+| `/servercount` | Sem opções | Embed público com total do cache atual; não pressupor um número previamente | NOT_EXECUTED |
+| `/status` | `url:https://example.com` | Embed público com status observado ou falha genérica; disponibilidade não presumida | NOT_EXECUTED |
+| `/timer` | `set tempo:1`; após observar vencimento, `set tempo:2` e `stop` | Confirmação pública e aviso público no canal após cerca de um minuto; novo timer cancelado sem aviso posterior | NOT_EXECUTED |
+| `/todo` | `list`, `add tarefa:Ensaio P3.3`, `list`, `remove numero:<índice do item criado>` | Todas as respostas efêmeras; remover somente após confirmar inclusão e índice da tarefa do ensaio, sem tocar em itens preexistentes | NOT_EXECUTED |
+| `/translate` | `idioma:pt`, `texto:Hello world` | Tradução pública com menção; falha efêmera sanitizada | NOT_EXECUTED |
+| `/vote` | Sem opções | Embed/botão top.gg público e estrela; página externa independente do ID da instância | NOT_EXECUTED |
+
+Complementos proporcionais, também **NOT_EXECUTED**: uma segunda chamada de `/formatar` com `linguagem:markdown` e um bloco Markdown cercado de código deve devolver anexo integral; o QR e Lofi já cobrem upload de imagem. Conferir o ID do botão de convite com a aplicação esperada, sem publicar credenciais. Verificar privacidade de `/todo` e `/ping` com outro participante autorizado; isolamento de servidor/DM e envio em threads ficam pendentes se não fizerem parte do ensaio. Para `/status`, uma entrada loopback como `url:http://127.0.0.1` deve ser recusada localmente, sem acesso ao destino. Falhas deliberadas de permissões dependem de autorização para a mudança remota e não fazem parte desta preparação.
+
+Critério de encerramento posterior: registrar por comando resultado observado e limitações, confirmar o encerramento somente do processo criado, atualizar CURRENT/QUALITY_GATES e manter R12 **MITIGATED** enquanto identidade/permissões/links reais não forem demonstrados. Nenhum item desta tabela deve ser marcado como aprovado com base apenas nos testes offline ou no log de ready.
+
+## Registro histórico — preparação P3.2
+
 Atualizado na **P3.2 — R12, 2026-11-23**, base `develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18`, árvore limpa no início. P3.1 já está commitada nessa base; resultados anteriores são históricos em [QUALITY_GATES](QUALITY_GATES.md). A P3.2 valida identidade/convites/URLs e prepara o procedimento Windows sem login, registro global ou alterações remotas. R12 permanece **MITIGATED** pelas verificações Discord ainda pendentes. O [ADR 0003](decisions/0003-estado-operacional-temporario.md) mantém estado exclusivamente em memória e perda após reinício aceita; R17 preserva diagnósticos mínimos e retenção externa `NOT_CONFIRMED`. Os exemplos usam PowerShell na raiz; a execução do bot e o registro continuam ações separadas que exigem autorização explícita.
 
 Evidências P3.2: suíte **1266/1266**, focais R12 **77/77**, dry-run com **23 comandos/exit 0**, instalações limpas normal/produção **85 pacotes/exit 0** cada e 23 contratos/hash preservados em ambas. Esses resultados offline não verificam login, aplicação/token associados, permissões, páginas externas ou disponibilidade da hospedagem; detalhes e limites em qualidade.
@@ -122,7 +178,7 @@ A página top.gg histórica `https://top.gg/bot/1193011045577523300` é um link 
 
 ### Preparação neste computador — sequência pronta
 
-**Pendência local comprovada:** a leitura offline e sanitizada de `.env` na P3.2 encontrou `INVITE_URL` incompatível com a política atual. Nenhum valor foi exibido ou alterado. Antes de iniciar, abra `.env` localmente e deixe **`INVITE_URL=` vazia**, para gerar o convite da identidade atual. Preserve TOKEN e CLIENT_ID e confira a correspondência manualmente no Developer Portal; não copie valores para chat/logs. A instalação e os testes offline não significam que a configuração local já permita iniciar.
+**Pendência local comprovada na P3.2 e reconfirmada na P3.3:** `INVITE_URL` continua incompatível com a política atual. O usuário adiou o ajuste; a preparação está bloqueada neste checkpoint, sem alteração de `.env`, override temporário ou autorização de login solicitada. Quando decidir retomar, deixar **`INVITE_URL=` vazia** em editor local, preservando TOKEN/CLIENT_ID, e repetir a validação antes de qualquer conexão. Não copie valores para chat/logs. Instalação e testes offline não significam que a configuração já permita iniciar.
 
 CLIENT_ID e LOFIRADIO_URL locais passaram na validação estrutural individual; uma cópia somente em memória do ambiente com INVITE_URL vazia passou em `readConfig`. Isso identifica o override do convite como a pendência local observada, sem provar token válido ou correspondência remota e sem alterar `.env`.
 
@@ -249,7 +305,7 @@ Runtime LTS, instalações limpas normal/produção e contratos offline foram va
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P3.1 está na base `3ecdd7c` e P3.2 permanece local sem commit/push. Uma clonagem dessa base ainda não inclui as alterações locais desta entrega.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. A P3.3 confirmou pelo GitHub que P3.2 está commitada e enviada em `9d1b863`, idêntica à `develop` remota (ahead 0 / behind 0). Uma clonagem dessa revisão inclui a P3.2, mas não as alterações locais posteriores da P3.3; a operação de clonar não foi executada nesta fase.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.
