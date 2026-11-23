@@ -1,34 +1,84 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const axios = require('axios');
+const { SlashCommandBuilder } = require("discord.js");
+const { deferResponse, respond } = require("../lib/interactions");
+const { getJson, HttpRequestError } = require("../lib/http-client");
+const {
+  requireSuccessfulResponse,
+  apiErrorMessage,
+} = require("../lib/api-errors");
+const {
+  validText,
+  textPayload,
+  MAX_TEXT_ATTACHMENT_BYTES,
+} = require("../lib/content-limits");
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('translate')
-        .setDescription('Traduz um texto para o idioma especificado')
-        .addStringOption(option => 
-            option.setName('idioma')
-                .setDescription('Sigla do idioma para o qual o texto será traduzido')
-                .setRequired(true))
-        .addStringOption(option => 
-            option.setName('texto')
-                .setDescription('Texto a ser traduzido')
-                .setRequired(true)),
+  data: new SlashCommandBuilder()
+    .setName("translate")
+    .setDescription("Traduz um texto para o idioma especificado")
+    .addStringOption((option) =>
+      option
+        .setName("idioma")
+        .setDescription("Sigla do idioma para o qual o texto será traduzido")
+        .setRequired(true),
+    )
+    .addStringOption((option) =>
+      option
+        .setName("texto")
+        .setDescription("Texto a ser traduzido")
+        .setRequired(true),
+    ),
 
-    async execute(interaction) {
-        const texto = interaction.options.getString('texto');
-        const idioma = interaction.options.getString('idioma');
+  async execute(interaction) {
+    const texto = interaction.options.getString("texto");
+    const idioma = interaction.options.getString("idioma");
+    if (
+      !validText(texto) ||
+      !validText(idioma) ||
+      !/^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/i.test(idioma)
+    ) {
+      return respond(interaction, {
+        content:
+          "Informe um texto não vazio de até 6000 caracteres e uma sigla de idioma válida (ex.: pt ou pt-BR).",
+        ephemeral: true,
+      });
+    }
+    await deferResponse(interaction);
+    let payload;
 
-        try {
-            const response = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${idioma}&dt=t&q=${encodeURIComponent(texto)}`);
-            
-            const traducao = response.data[0][0][0];
+    try {
+      const response = await getJson(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(idioma)}&dt=t&q=${encodeURIComponent(texto)}`,
+      );
+      requireSuccessfulResponse(response);
 
-            const textoTraduzido = `🗺️ | <@${interaction.user.id}>\n${traducao}`;
+      const segments = response.data?.[0];
+      if (
+        !Array.isArray(response.data) ||
+        !Array.isArray(segments) ||
+        segments.length === 0 ||
+        !segments.every(
+          (segment) =>
+            Array.isArray(segment) &&
+            typeof segment[0] === "string" &&
+            segment[0].isWellFormed(),
+        )
+      ) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
+      }
+      const traducao = segments.map((segment) => segment[0]).join("");
+      if (!validText(traducao, MAX_TEXT_ATTACHMENT_BYTES)) {
+        throw new HttpRequestError("HTTP_INVALID_BODY");
+      }
 
-            await interaction.reply(`${textoTraduzido}`);
-        } catch (error) {
-            console.error('Erro ao traduzir texto:', error);
-            await interaction.reply({ content: 'Ocorreu um erro ao traduzir o texto.', ephemeral: true });
-        }
-    },
+      const textoTraduzido = `🗺️ | <@${interaction.user.id}>\n${traducao}`;
+
+      payload = textPayload(textoTraduzido, "traducao.txt");
+    } catch (error) {
+      payload = {
+        content: apiErrorMessage(error, "Ocorreu um erro ao traduzir o texto."),
+        ephemeral: true,
+      };
+    }
+    return respond(interaction, payload);
+  },
 };

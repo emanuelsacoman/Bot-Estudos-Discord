@@ -1,0 +1,226 @@
+# Arquitetura implementada
+
+Atualização **P3.2 — R12, 2026-11-23**, base **develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18**, inicialmente limpa; P3.1 já commitada. Identidade e links públicos são validados localmente em config.js; o convite usa a aplicação da interação e confere CLIENT_ID/INVITE_URL quando configurados. R12 fica **MITIGATED** por identidade/permissões/links remotos ainda não confirmados. As proteções P0–P3.1, os 23 contratos e ADRs 0001–0003 são preservados. Resultados históricos e atuais em [qualidade](QUALITY_GATES.md), [estado](PROJECT_STATE.md), [comandos](COMMANDS.md) e [operação](OPERATIONS.md).
+
+Fechamento P3.3 e preparação P3.4, base develop/6478dab: o responsável confirmou configuração/login, 134 servidores observados e os 23 comandos manualmente funcionais. Essa evidência operacional agregada não altera a arquitetura nem comprova todos os contextos/permissões/restart/hospedagem/retenção; nenhum log ou cenário individual foi coletado. Gates atuais e comparação de main estão em [QUALITY_GATES](QUALITY_GATES.md); R12 segue MITIGATED. Código e ADRs preservados nesta entrega documental.
+
+## Componentes e responsabilidades
+
+É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Cada comando concentra definição pública e execução, com módulos locais para configuração, catálogos de comandos/documentação, inicialização/registro, respostas, HTTP e timers. Não há camadas de domínio ou repositórios separadas, banco de dados, servidor HTTP próprio, fila, CI ou infraestrutura de hospedagem versionada. A suíte `node:test` usa relógio, Discord e transporte simulados; evidências e limites estão em qualidade.
+
+| Componente | Responsabilidade efetiva |
+|---|---|
+| [index.js](../../index.js) | Exporta `main` e `configureClient`; registra eventos/cooldowns/menu antes do login. O guard `require.main` impede iniciar o bot ao importar o módulo. |
+| [deploy-commands.js](../../deploy-commands.js) | CLI separada de registro com guard `require.main`: valida o catálogo com `--dry-run` ou exige `--confirm-global-replacement` para o PUT global. Não é chamada pelo runtime. |
+| [lib/logging.js](../../lib/logging.js) | Envio protegido de uma mensagem curta por log/warn/error; rejeita objetos/controles e isola throw/rejeição do logger. Não é redator universal nem armazenamento de logs. |
+| [lib/config.js](../../lib/config.js) | Validação local de TOKEN opaco, CLIENT_ID opcional no runtime/obrigatório no registro, convite OAuth e link Lofi; constantes públicas e mensagens fixas sem valores sensíveis. Não consulta credenciais remotamente. |
+| [lib/command-catalog.js](../../lib/command-catalog.js) | Carregamento ordenado e validação compartilhada de contratos, nomes/opções e snapshot JSON; falha bloqueia o catálogo inteiro. |
+| [lib/documentation-catalog.js](../../lib/documentation-catalog.js) | Fonte única das 25 tecnologias, com identificador, label, descrição e URL; ordem pela posição no array. Valida dados/limites e expõe snapshot congelado, opções e lookup por Map. |
+| [lib/documentation-interactions.js](../../lib/documentation-interactions.js) | Trata somente string select com `codebucket:docs:select`; valida exatamente uma seleção conhecida e responde pelo helper comum, sem consultar URLs. |
+| [lib/startup.js](../../lib/startup.js) | Ordena ambiente/configuração, catálogo, Client, handlers e login; limita login e limpeza em falhas, com saída de erro controlada. |
+| [lib/registration.js](../../lib/registration.js) | Decide modo da CLI, prepara/revalida configuração e payload e faz PUT global somente quando confirmado; REST sem retry e erros sanitizados. |
+| [commands/](../../commands/) | 23 módulos com `data` (SlashCommandBuilder) e `async execute(interaction)`; definição pública e comportamento permanecem locais, delegando envio de respostas e prazos HTTP aos helpers. |
+| [lib/status-http.js](../../lib/status-http.js) | Política de URLs/IPs, resolução DNS e GET de `/status` preso a um IP validado, com limites e erros sanitizados. Usa somente módulos nativos do Node. |
+| [lib/interactions.js](../../lib/interactions.js) | Defer, reply/edit/followUp por estado, visibilidade, expiração, falhas sem retry e captura de operações secundárias. `runWithErrorHandling` envolve o listener. |
+| [lib/http-client.js](../../lib/http-client.js) | GET axios/fetch com prazo total de 5000 ms, 1 MiB antes do JSON estrito, cancelamento/erros classificados e zero redirects/retries. Pausas de quota/backoff apenas em memória; não substitui a política SSRF de `/status`. |
+| [lib/api-errors.js](../../lib/api-errors.js) | Validação do status esperado e mensagens comuns de falha de APIs; não publica erro bruto nem altera a visibilidade escolhida pelo comando. |
+| [lib/timers.js](../../lib/timers.js) | Duração e chave de contexto, Map de agendamentos com relógio injetável, cancelamento/expiração por identidade e captura do envio final. |
+| [lib/todo-store.js](../../lib/todo-store.js) | Maps por usuário/contexto, contexto explícito de servidor ou DM, operações síncronas e cotas agregadas por usuário/processo; sem persistência. |
+| [tests/](../../tests/) | Testes offline de contratos, SSRF, interações, HTTP, configuração, bootstrap, registro, timers, arquivos/limites, privacidade/isolamento/cotas de todo, catálogo/roteamento de docs e confiabilidade das seis APIs, sem credenciais ou rede reais. |
+| [images/](../../images/) | Três imagens versionadas; `lofiradio.jpeg` e `lofiicon.png` são anexadas pelo comando Lofi. A presença de `topgg.png` não implica seu uso por `/vote`. |
+| [package.json](../../package.json), [package-lock.json](../../package-lock.json) | Faixas de dependências e resolução exata. Lockfile v3; entrada principal `index.js`; script `test` executa `node --test`. P1.3 não adiciona dependências. |
+| [.nvmrc](../../.nvmrc) | Versão exata Node `24.22.2`; `engines.node` em `package.json` declara a linha `24.x`. A ativação local está descrita em operação. |
+| [.gitignore](../../.gitignore), [.env.example](../../.env.example) | `.env` e `node_modules` ignorados; exemplo público de configuração. Segredos são locais/externos ao Git. |
+| [AGENTS.md](../../AGENTS.md), [docs/](../README.md) | Protocolo permanente e memória documental. Descrevem o sistema; não implementam comportamento do bot. |
+
+## Inicialização e ciclo de vida
+
+```mermaid
+flowchart TD
+    Runtime[index.js: main explícito] --> Env[dotenv lazy / ambiente]
+    Env --> Config[config: valida TOKEN]
+    Config --> Catalog[command-catalog: contratos + snapshot]
+    Modules[commands/*.js] --> Catalog
+    Catalog --> Client[Client: intent Guilds]
+    Client --> Setup[configureClient: handlers antes do login]
+    Setup --> Login[login: prazo de 30 s]
+    Login --> Ready[ready: logs + presença a cada 100 s]
+    Login --> Guild[guildCreate: logs]
+    Login --> Interaction[InteractionCreate]
+    Interaction --> Select[StringSelectMenu: ID específico de docs]
+    Select --> DocsHandler[documentation-interactions: valor conhecido]
+    DocsCatalog[documentation-catalog: 25 tecnologias] --> DocsHandler
+    DocsCatalog --> DocsMenu[commands/docs: menu]
+    DocsHandler --> Responses
+    Interaction --> Slash[isCommand: procura por nome]
+    Slash --> Cooldown[Cooldown por usuário e comando]
+    Cooldown --> Execute[execute interaction]
+    Execute --> APIs[HTTP externo]
+    Execute --> HTTP[lib/http-client.js: prazo e cancelamento]
+    HTTP --> APIs
+    Execute --> Responses[lib/interactions.js: resposta por estado]
+    Responses --> Discord[REST de respostas Discord]
+    Execute --> Status[lib/status-http.js: destino validado]
+    Status --> APIs
+    Execute --> Memory[Map todo / manager timers em memória]
+    Execute --> Files[QR PNG e texto em Buffers por resposta]
+    Register[deploy-commands.js: CLI separada] --> Mode{argumento único}
+    Mode --> DryRun[dry-run: somente catálogo, sem env ou REST]
+    Mode --> Confirm[confirmação: env + config + catálogo]
+    Confirm --> REST[PUT global: prazo de 15 s, sem retry]
+    Mode --> Block[inválido ou ausente: exit 1]
+```
+
+1. Importar os pontos de entrada não faz login nem registro. `index.main` carrega dotenv somente quando invocado; `.env` continua relativo ao diretório de execução e variáveis já injetadas prevalecem.
+2. `readConfig` valida TOKEN, CLIENT_ID quando configurado e URLs configuradas antes do catálogo e da criação do Client. Remove prefixo convencional `Bot`/`Bearer`, aceita token opaco de 20–512 caracteres ASCII alfanuméricos ou `_ . -` e recusa placeholders/formas evidentemente inválidas. Isso não comprova validade, identidade ou associação remota da credencial.
+3. `loadCommandCatalog` importa os arquivos `.js` diretamente em `commands/`, ordenados, e valida `execute`, builder, serialização, nomes únicos e opções. Recusa catálogo vazio/parcial, campos não suportados, valores inseguros e estruturas não representáveis no snapshot JSON; a política aceita os contratos slash atuais. Importar módulos continua executando JavaScript confiável do projeto, sem sandbox por comando.
+4. Só após esses checks cria o Client com intent `Guilds`. `configureClient` preenche `client.commands` pelo catálogo validado e instala handlers de eventos, erros e interações **antes** de chamar login. Não há leitura de mensagens, intent privilegiado de membros ou reprodução de áudio.
+5. O login tem prazo de 30 s. Rejeição/timeout ou falha de preparação produz mensagem fixa e `exitCode = 1`; a limpeza da aplicação e `client.destroy()` têm janela de 2 s. Um watchdog de 5 s com `unref()` encerra com erro se recursos remanescentes mantiverem o processo vivo. Resultado tardio do login não é usado como sucesso, nem seu retorno/token é logado.
+6. Desde a P3.1, `ready` registra somente confirmação fixa de login e total agregado de servidores; `guildCreate` registra o evento fixo e o total. Não enumera servidores nem lê tag do bot, nome/ID/memberCount individual ou data/hora detalhada para logging. Contagem inválida é omitida sem coerção. A seleção de uma das 27 presenças a cada 100 s e `runSecondary` são preservados. Esses eventos reais não foram exercitados; os testes são simulados.
+7. O cleanup retornado por `configureClient` remove intervalo de presença, timeouts de cooldown e listeners operacionais em falha de inicialização. Mantém somente um handler fixo de erro para falhas tardias durante a destruição do SDK; esse listener não mantém o event loop ativo. Não há rotina geral de SIGINT/SIGTERM; `timers.clearAll` está disponível no manager, sem integração automática ao encerramento do processo. Estado operacional não é persistido nem restaurado: parar o bot o perde, comportamento aceito no [ADR 0003](decisions/0003-estado-operacional-temporario.md). Consulte [OPERATIONS.md](OPERATIONS.md).
+
+## Confiança e efeitos na importação — P2.5
+
+O carregamento é uma fronteira de **código local confiável**, não um sistema de plugins de usuários. [loadCommandCatalog](../../lib/command-catalog.js) descobre somente `.js` no diretório local padrão `commands/`, ordena os nomes lexicalmente, rejeita nomes com travessia por `basename` e importa caminhos resolvidos. Nenhuma interação controla esse diretório, o `loadModule` ou o argumento de `require`: [index.js](../../index.js) consulta apenas a Collection já carregada por `commandName`. Overrides do carregador são interfaces locais de teste/integração, não parâmetros Discord.
+
+Depois de importar todos os módulos, o catálogo exige funções `execute` e `data.toJSON`, coerência entre nome do builder e payload, nomes únicos, opções/choices e esquema público válidos. O snapshot JSON é congelado profundamente e recusa ciclos, accessors no payload, símbolos, estruturas não JSON e chaves/protótipos perigosos. O array de comandos é congelado; os objetos de comando/builders não são congelados profundamente. Falha de descoberta, importação, serialização ou validação impede devolver um catálogo parcial. [startup.js](../../lib/startup.js) prepara configuração/catálogo antes de criar Client/login; [registration.js](../../lib/registration.js) compartilha o carregador e revalida o payload antes de criar REST. Diagnósticos dessas fronteiras são sanitizados. Os guards `require.main` mantêm as duas entradas inertes quando apenas importadas.
+
+Inventário das **23 fontes** e seus helpers locais, por leitura na P2.5:
+
+| Módulos em commands/ | Trabalho no escopo do módulo | Trabalho operacional fica em |
+| --- | --- | --- |
+| autor, count, exercise, help, invite, lofiradio, ping, playlist, servercount, vote | Imports, declarações e builders. Banco/sorteio de exercise são construídos ao chamar gerarExercicio; invite/lofiradio não leem suas URLs de ambiente na importação. | execute e funções chamadas por ele. |
+| github, repositorys, question, translate, moeda, http | Imports/builders; o helper HTTP cria funções e Map de pausas vazio. | execute; requisições, prazos, pausas e parse não começam no require. |
+| [docs](../../commands/docs.js) | Imports/builder; validação do catálogo estático e Map transitivo em [documentation-catalog](../../lib/documentation-catalog.js). | Construção/envio do menu em execute. |
+| [formatar](../../commands/formatar.js) | Imports, mapa de extensões congelado e builder; importa Prettier. | Formatação e respostas em execute. |
+| [git](../../commands/git.js) | Criação local de embed/timestamp e builder. Não executa Git. | Envio do embed em execute. |
+| [qrcode](../../commands/qrcode.js) | Importa encoder, declara constante e builder. | Geração PNG em Buffer e envio em execute. |
+| [status](../../commands/status.js) | Imports/builder; factory do helper captura funções DNS/HTTP, sem consulta. | A chamada da função checkStatus dentro de execute. |
+| [timer](../../commands/timer.js) | createTimerManager cria Map vazio em [timers](../../lib/timers.js), sem agendar. | set/stop em execute e callback agendado explicitamente. |
+| [todo](../../commands/todo.js) | createTodoStore cria memória vazia em [todo-store](../../lib/todo-store.js). | Operações em execute. |
+
+Constantes, classes, Maps/WeakMaps vazios e builders são inicialização local legítima. Nas fontes de aplicação auditadas não há rede, leitura de credenciais, escrita/exclusão de arquivos, criação de Client Discord, processos filhos ou listeners globais iniciados pelo require. Rotinas de login, eventos e timers de operação são chamadas explicitamente pelos fluxos de execução.
+
+Há efeitos **transitivos locais** que impedem afirmar ausência absoluta de trabalho assíncrono ou mutação global. No **Prettier 3.5.3**, `node_modules/prettier/index.cjs:619` inicia `import("./index.mjs")`. No tslib instalado, `node_modules/tslib/tslib.js:46–68,417–448` publica 32 funções auxiliares com prefixo `__` em globalThis pelo seu wrapper UMD. A pilha HTTP inicializa símbolos globais `undici.globalDispatcher.1` e `undici.globalDispatcher.2`: o **undici 6.21.1** usa o símbolo `.1` em `node_modules/undici/lib/global.js:3–10,18–23`; o Undici embutido no Node 24 usa `.2` e mantém compatibilidade com `.1`. Esses componentes criam ou reutilizam Agents ociosos conforme o estado e a ordem do carregamento. Esses efeitos foram observados nos probes e atribuídos à inicialização local das dependências; não formatam texto, abrem rede ou criam Client Discord. Não há evidência que justifique refatorar os comandos por esses efeitos conhecidos nesta fase.
+
+A verificação pontual da P2.5 importou individualmente os 23 comandos, o catálogo completo e index/deploy/startup/registration em **28 processos novos**, sem chamar main ou execute e com operações externas bloqueadas antes do carregamento. Não observou tentativas das operações guardadas; registrou separadamente as mutações globais transitivas descritas acima. Isso verifica os caminhos e a instalação atuais, não isola código malicioso nem prova ausência universal de efeitos. Resultados e alcance dos guards estão em [QUALITY_GATES](QUALITY_GATES.md).
+
+R03 permanece **MITIGATED**: require, imports transitivos e toJSON executam código do checkout antes de a validação poder recusá-lo, e a validação não desfaz efeitos anteriores. Código local malicioso, dependências/instalação comprometidas, symlinks e mutação deliberada dos objetos de comando ficam fora de uma garantia de isolamento; não foi identificado caminho de exploração por uma entrada Discord para esses mecanismos. Não há sandbox, restrição geral de imports ou preempção de JavaScript síncrono. Manter a implementação é proporcional ao modelo atual; o gate de payload protege contratos e falhas involuntárias, não executa uma análise de segurança do JavaScript. Evidência executável e limitações da auditoria ficam em [QUALITY_GATES](QUALITY_GATES.md); a política de revisão local está em [OPERATIONS](OPERATIONS.md#revisar-módulos-locais-antes-de-carregar--p25).
+
+## Interações, cooldown e erros
+
+O listener examina primeiro `isStringSelectMenu()` e delega a [documentation-interactions.js](../../lib/documentation-interactions.js). O handler atende somente `customId = "codebucket:docs:select"` e exige `values` como array de exatamente uma string presente no catálogo. Seleções válidas recebem o texto/link público existente; valores desconhecidos ou malformados recebem apenas “Opção não reconhecida.”, sem ecoar entrada nem consultar URLs. O lookup por Map não aceita propriedades herdadas. Outros selects retornam sem resposta e sem cair no fluxo slash/cooldown. Menus continuam sem cooldown e podem ser usados por outros usuários, como antes.
+
+[documentation-catalog.js](../../lib/documentation-catalog.js) concentra as 25 entradas em ordem de apresentação, com snapshot congelado e cópias de opções para o builder. Rejeita catálogo vazio ou acima de 25, IDs não canônicos/duplicados, labels/descrições vazios, Unicode inválido ou acima de 100 unidades UTF-16, URLs HTTPS inválidas/com credenciais e resposta acima do limite de mensagem. A única manutenção dos dados é nesse módulo; alterar a posição muda a ordem. Uma 26ª tecnologia exige decisão própria sobre a experiência do menu, sem paginação implícita.
+
+Os menus antigos publicados com `customId = "select"` são ignorados. O identificador genérico não comprova a origem `/docs`; não há inferência pelo texto/valor da mensagem nem compatibilidade indiscriminada. O usuário substitui o menu executando `/docs` novamente; mensagens antigas não são editadas ou removidas. Laravel existia somente no mapa histórico, nunca nas 25 opções preservadas; não integra o catálogo nem o roteamento atual.
+
+Para `isCommand()`, procura o nome na Collection; se não encontrar, apenas registra erro e retorna. O cooldown é uma Collection por comando contendo timestamps por ID de usuário. Usa `(command.data.cooldown || 5) * 1000`; nenhum módulo define `data.cooldown`, portanto o padrão atual é cinco segundos. A chave não inclui servidor. Registra o timestamp antes de executar, mesmo quando a execução falha, e o remove por `setTimeout`; reinícios e outros processos não compartilham esse limite. Os handles são acompanhados para limpeza em falha de inicialização.
+
+O listener inteiro é envolvido por `runWithErrorHandling`; select, cooldown e os 23 comandos usam `respond`. Sem reconhecimento, responde com reply; defer pendente usa editReply; resposta concluída usa followUp. `/ping` usa `editResponse` para editar a mensagem original privada. Uma WeakMap registra envio em andamento, falha e erro já reportado, evitando duplicação/retry após entrega ambígua. Códigos terminais e prazo local impedem novo envio; o tratamento da própria falha de resposta também é capturado. Logs novos usam somente mensagens fixas.
+
+Defer é público por padrão. Para manter erros efêmeros depois dele, o helper conclui o loading com U+200B neutro, envia o resultado privado em follow-up com flag 64 e remove o placeholder. A edição original nunca recebe conteúdo privado; uma falha encerra a sequência, podendo deixar o placeholder neutro. Isso respeita a visibilidade imutável do reconhecimento e evita a semântica especial do primeiro follow-up após defer, descrita no [contrato Discord](https://docs.discord.com/developers/interactions/receiving-and-responding).
+
+Reações usam `runSecondary`, que aguarda/captura falha sem invalidar a resposta principal. O manager de timers captura o envio tardio depois de remover o agendamento, sem reutilizar a interação. P2.1 gera QR em Buffer, captura falhas de geração com aviso privado e não cria arquivo mesmo se o envio falhar. Os prazos são verificados antes de cada chamada REST (3 s sem reconhecimento, 15 min para interação reconhecida desde a criação); rede/carga, relógio local e operação remota continuam limitações explícitas.
+
+## Logs e diagnósticos — P3.1
+
+A auditoria da baseline identificou **24 pontos de logging executável**. A exposição local concreta estava em [index.js](../../index.js): ready enumerava nome/ID/memberCount de cada servidor e repetia a tag do bot; guildCreate incluía nome/ID e data/hora detalhadas. Os demais pontos já produziam mensagens fixas ou contagens, sem Error/stack/corpo HTTP. Logger que lança ou rejeita podia interromper startup/cleanup, interação/presença ou alterar o retorno do registro após envio concluído. Nenhum comando registra dados diretamente; a ocorrência de “console” em exercise é texto de enunciado.
+
+| Fonte auditada | Baseline | Comportamento atual |
+| --- | --- | --- |
+| [index.js](../../index.js) | 12 pontos; login/tag/lista de servidores/evento/data-hora/total e dois erros fixos | 5 chamadas a safeLog: login/evento fixos, total agregado validado e erros fixos de conexão/comando ausente. A função de total é compartilhada por ready/guildCreate. |
+| [startup.js](../../lib/startup.js) | 3 diagnósticos de configuração/login/preparação/limpeza | Mesmas mensagens sanitizadas, com saída/cleanup preservados mesmo se o logger falhar. |
+| [registration.js](../../lib/registration.js) | 4 diagnósticos de CLI/catálogo/sucesso/falha | Mensagens fixas e somente contagem validada do catálogo; logging não reclassifica resultado do envio nem repete PUT. |
+| [interactions.js](../../lib/interactions.js) | 3 diagnósticos de erro/resposta/secundária | Mesmos textos fixos; falha do logger não impede tratamento/continuação da interação. |
+| [deploy-commands.js](../../deploy-commands.js) | 1 erro fixo de preparação | Mesmo diagnóstico por safeLog. |
+| [timers.js](../../lib/timers.js) | 1 aviso fixo no onError padrão | Mesmo aviso por safeLog; captura do callback e falha secundária permanece. |
+| [http-client.js](../../lib/http-client.js), [status-http.js](../../lib/status-http.js), [api-errors.js](../../lib/api-errors.js) e [commands/](../../commands/) | Sem logging de requisições, respostas ou conteúdo privado | Continuam sem logging desses dados; nada novo de coleta. |
+
+Todos os **17 pontos atuais** usam [safeLog](../../lib/logging.js). O helper admite apenas log/warn/error e uma string não vazia, Unicode bem formado, até 500 unidades UTF-16, sem controles ASCII/DEL. Não converte Error/objeto para texto. Captura falha ao acessar/chamar o logger e consome sua rejeição assíncrona sem aguardar, repetir, tentar fallback recursivo, criar fila ou buffer persistente. O retorno local não garante que a plataforma recebeu a mensagem. Produtores continuam responsáveis por usar mensagens fixas ou contagens numéricas validadas: safeLog não reconhece/redige automaticamente segredos dentro de uma string arbitrária.
+
+A aplicação não envia ao logger tokens, cookies/headers sensíveis, URLs de requisição/query, corpos HTTP, objetos de interação/erro, IDs/nomes individuais, conteúdo de todo ou texto de tradução. Diagnósticos úteis de login, evento de adição, total de servidores, configuração, catálogo, inicialização/limpeza, falha de registro/interação/secundária e aviso de timer permanecem. Não há arquivo de log, cache em disco, coleta nova, dependência de observabilidade ou persistência. Falha do destino de log pode perder o diagnóstico, mas não deve mudar o fluxo operacional.
+
+R17 permanece **MITIGATED**: os pontos locais foram minimizados e isolados, mas histórico, captura/acesso/retenção do stdout/stderr por hospedagem não identificada continuam NOT_CONFIRMED e fora do controle do código. A [política operacional](OPERATIONS.md#política-de-logs-e-retenção--p31) exige tratar esses itens em tarefa autorizada, sem inventar prazo ou garantia do provedor. Evidências e limites dos testes em [QUALITY_GATES](QUALITY_GATES.md).
+
+## Identidade, convites e links públicos — P3.2
+
+[config.js](../../lib/config.js) concentra readClientId, buildInviteUrl, readLofiUrl, o bitfield 117824 e as páginas históricas top.gg/Lofi. Não lê ambiente, segredos, arquivos ou rede na importação. O TOKEN continua opaco; não se tenta extrair ID dele. CLIENT_ID é opcional no runtime e validado quando informado; no registro é obrigatório.
+
+Em /invite, applicationId da interação Discord é a identidade efetiva. CLIENT_ID, quando presente, deve coincidir; sem interação, o helper exige CLIENT_ID para construção offline. Sem ambos, falha em vez de usar um ID histórico. INVITE_URL vazia gera URL canônica; preenchida precisa usar HTTPS discord.com, /oauth2/authorize ou /api/oauth2/authorize, exatamente client_id/permissions/scope únicos, ID coerente, permissions=117824 e scopes bot applications.commands (qualquer ordem). Não aceita credenciais, portas explícitas, fragmentos, parâmetros extras ou privilégios adicionais. Configuração inválida produz mensagem fixa privada, sem botão/reação. Os envs explícitos também são validados antes de Client/login; a identidade autenticada só pode ser confrontada quando há interação real.
+
+LOFIRADIO_URL usa HTTPS, hostname DNS de formato público (sem IP/hostname local ou sufixos locais/reservados), sem credenciais/porta/query/fragmento, whitespace/controles/backslash ou percent-encoding malformado. Limite de 512 na entrada e URL final serializada; delimitadores Markdown são codificados mantendo o destino. Essa é uma política conservadora para link público exibido, sem fetch/DNS, teste de disponibilidade ou promessa de que o destino não redireciona. Não substitui nem altera a proteção SSRF de /status. Segredos também nunca devem ser colocados no caminho de uma URL pública.
+
+A página https://top.gg/bot/1193011045577523300 é externa e histórica; não é reconstruída com CLIENT_ID nem atesta identidade atual. O link Lofi histórico https://lofiradio.web.app é preservado. Campos link nas cinco presenças eram ignorados pela API ActivityOptions instalada: foram removidos, preservando 27 textos/tipos e intervalo de 100 s. Não foram convertidos em streaming nem prometidos como clicáveis. Os links legítimos anteriormente presentes (site, repositório e playlist) ficam inventariados em [COMMANDS](COMMANDS.md); links efetivos de /vote, /lofiradio, /playlist e /autor permanecem.
+
+O convite cobre canais de texto comuns, sem Administrator. Threads exigem SendMessagesInThreads adicional para o aviso de /timer; overwrites/acesso/instalação são externos. O único intent continua Guilds. Matriz completa e distinção entre webhook de interação, reação e channel.send em [COMMANDS](COMMANDS.md). R12 **MITIGATED**, sem login/registro remoto nesta fase.
+
+## Registro e autenticação
+
+[deploy-commands.js](../../deploy-commands.js) delega a [registration.js](../../lib/registration.js). A CLI aceita exatamente **um** argumento: `--dry-run` valida o catálogo sem carregar `.env`/credenciais e sem REST; `--confirm-global-replacement` carrega ambiente, valida TOKEN/CLIENT_ID e o mesmo catálogo usado pelo runtime antes do PUT. Sem argumento, com opções desconhecidas ou combinadas, retorna erro e não envia nada. A API de envio também exige confirmação explícita e revalida configuração/payload.
+
+`CLIENT_ID` deve ser string decimal de 17–20 dígitos, sem zero inicial e dentro de uint64; só o modo de registro o exige, mas o runtime também o valida quando presente. O snapshot do payload é validado antes de criar a instância REST. O PUT usa Discord v10, `Routes.applicationCommands(CLIENT_ID)`, prazo/sinal de cancelamento de 15 s, `retries: 0` e rejeição de rate limit. Falha retorna mensagem fixa e código 1; os recursos locais de REST são limpos sem repetir o PUT. O alvo continua global, sem `GUILD_ID`, e substitui todo o conjunto remoto; não há registro individual ou por servidor.
+
+O registro não inicia o Client e o runtime não registra comandos remotamente. Configuração do aplicativo, scopes, permissões e correspondência de token/aplicação dependem do Discord; seu estado atual é `NOT_CONFIRMED`. Desde a P3.2, `/invite` usa a identidade da interação, confere configurações explícitas e solicita scopes `bot applications.commands` com `permissions=117824`. Isso não comprova permissões efetivas nos canais.
+
+**Não executar o modo confirmado como teste local.** A proteção da CLI não concede autorização para alterar o catálogo remoto; o modo dry-run apenas valida arquivos locais. Envio, rate limit, permissões e estado remoto permanecem `NOT_CONFIRMED`.
+
+## Dependências e integrações
+
+| Dependência | Versão resolvida no lock | Uso observado |
+|---|---|---|
+| discord.js | 14.18.0 | Gateway, builders, Collections, respostas e registro REST; API REST v10. |
+| axios | 1.8.4 | Consultas HTTP em cinco comandos via `lib/http-client.js`; `/status` usa `node:http` e `node:https`. |
+| dotenv | 16.4.7 | Carregado de forma lazy pelo bootstrap e pelo modo confirmado de registro; dry-run não o chama. |
+| qrcode | 1.5.4 | Geração de PNG local. |
+| node-fetch | 3.3.2 | Declarado, mas sem importação encontrada; `/github` usa `fetch` global. |
+| prettier | 3.5.3 | Formatação de código durante execução; dependência de produção, obrigatória no carregamento. A Fase 1 moveu a mesma faixa `^3.5.3` de devDependencies para dependencies. |
+
+Na P2.4, `/translate` passa a importar seu builder de `discord.js`, dependência direta já declarada, eliminando o import transitivo de `@discordjs/builders` sem atualizar pacotes. O projeto declara `engines.node: "24.x"` e fixa `24.22.2` em `.nvmrc`. Os requisitos antigos do lock chegam a Node `>=18.17` por `undici 6.21.1`; esse mínimo de pacote não substitui a política atual Node 24. A distribuição oficial Node `24.22.2` inclui npm `11.19.1`. Ambiente, fontes da versão e ativação estão em [OPERATIONS.md](OPERATIONS.md).
+
+Na auditoria inicial, Prettier era devDependency, embora importado por `/formatar` durante a inicialização. A classificação foi corrigida na Fase 1 ([R02](KNOWN_RISKS.md#r02)) sem upgrade de faixa ou versão resolvida. Com Node `24.22.2` e npm `11.19.1`, instalações limpas separadas com `npm ci` e `npm ci --omit=dev`, ambas com `--engine-strict`, passaram: 85 pacotes com versões iguais ao lock, 25 fontes com sintaxe válida e 23 comandos importados/serializados com nomes únicos em cada modo. O payload JSON permaneceu idêntico ao baseline anterior à mudança; os cinco parsers de `/formatar` passaram com resposta simulada. Isso resolve o carregamento em produção de R02, sem comprovar login ou operação no Discord. Métodos, isolamento e resultados estão em [QUALITY_GATES.md](QUALITY_GATES.md).
+
+| Fronteira externa | Comandos / uso | Autenticação observada |
+|---|---|---|
+| Gateway e REST Discord | Login, eventos, respostas e registro global | `TOKEN`; `CLIENT_ID` para registro. |
+| `api.github.com` | `/github`: dados de repositório via fetch global; `/repositorys`: busca por linguagem via axios | Sem token explícito. |
+| `api.stackexchange.com/2.3/search` | `/question`: pesquisa de títulos no Stack Overflow | Sem chave explícita. |
+| `translate.googleapis.com/translate_a/single` | `/translate`: tradução com `client=gtx`, origem automática | Sem chave explícita. |
+| `api.exchangerate-api.com/v4/latest` | `/moeda`: taxas e cálculo local | Sem chave explícita. |
+| `httpstat.us` | `/http`: código/descrição HTTP; 1xx é tratado localmente | Sem chave explícita. |
+| URL fornecida pelo usuário | `/status`: GET HTTP(S) direto do Node, após política de destino e DNS; prazo total de 5000 ms, corpo até 1 MiB, cabeçalhos até 16 KiB, zero redirecionamentos | Sem autenticação; URLs com credenciais são rejeitadas. |
+| Spotify, top.gg, Lofi Radio, autor, documentação, imagens externas | Links, botões e imagens exibidos nas mensagens/presença | Não há integração OAuth/API própria nesses links. |
+
+Os sete comandos HTTP deferem antes da API. Axios e fetch/JSON têm prazo total de 5000 ms com AbortSignal; `/status` conserva seu prazo e transporte próprios. Validações rápidas de `/question` e `/http` 1xx não deferem nem consultam API. `/formatar`, `/qrcode` e upload Lofi também reconhecem antes do trabalho demorado. Disponibilidade e destinos de links não foram testados remotamente. P2.4 consulta documentação oficial atual para delimitar políticas de quota/contratos; isso não comprova operação remota. Os contratos mínimos, fontes e riscos residuais estão na [auditoria das APIs](COMMANDS.md#contratos-externos--p24). As únicas variáveis de ambiente da aplicação permanecem `TOKEN`, `CLIENT_ID`, `INVITE_URL` e `LOFIRADIO_URL`.
+
+### Contratos e falhas das APIs — P2.4
+
+Os seis comandos de provedores fixos mantêm o mesmo endpoint e validação específica dos dados consumidos. O helper HTTP cuida do transporte, JSON estrito/status, deadline e pausas; ele não interpreta todos os schemas nem aceita destinos fornecidos ao `/status`. Consultas continuam sem autenticação externa nova. Erros expõem somente classificação/status sanitizados, sem corpo/headers/URL/configuração/cause brutos. R05/R06/R07/R11 e o catálogo de docs permanecem requisitos de regressão.
+
+Não há retentativa automática ou fila. Uma limitação HTTP reconhecida pode pausar chamadas seguintes do serviço em memória, seguindo indicação válida de `Retry-After`/reset ou a política local conservadora de 60 s, com teto de 24 h. Há cinco escopos fixos: quatro origens de provedores e o método search de Stack Exchange; os dois comandos GitHub compartilham sua origem. Esse teto não promete cumprir integralmente prazos arbitrários maiores informados pelo provedor. Stack Exchange também possui pausa por método a partir do `backoff`, inclusive com resposta de dados válida; quota esgotada sem prazo conhecido usa pausa local. Novas consultas bloqueadas retornam imediatamente, sem aguardar a liberação. Esse estado desaparece no reinício, não sincroniza processos/IP e não garante saldo do provedor ao terminar. O [ADR 0003](decisions/0003-estado-operacional-temporario.md) continua vigente.
+
+`/http` tem semântica própria: status 4xx/5xx solicitado e corpo coerente podem ser resultado válido; falha real/dados divergentes não são apresentados como documentação correta. GitHub recebe headers explícitos e avisa resultados de busca parciais. `/question` diferencia erro do wrapper de lista vazia; `/moeda` recusa taxa inválida e base contraditória. Dados extensos continuam em anexos completos/limitados e erros preservam sua privacidade. A [auditoria](COMMANDS.md#contratos-externos--p24) distingue essas regras locais das políticas dos provedores.
+
+R16 permanece `MITIGATED`: endpoint gtx de tradução não tem suporte formal confirmado, interface aberta v4 de câmbio não tem contrato/quota garantidos e limites compartilhados podem mudar. Sem migração de APIs, dependências novas, persistência, teste funcional remoto ou garantia operacional.
+
+### Fronteira HTTP de `/status` — P1.1
+
+O helper normaliza a URL com WHATWG, mantém HTTPS como padrão para entradas sem esquema e aceita apenas HTTP(S), sem credenciais. Rejeita nomes locais e endereços privados, loopback, link-local, metadata e faixas especiais/reservadas IPv4. Para IPv6, aceita conservadoramente unicast global `2000::/3`, com exclusões especiais; também rejeita IPv4-mapped, tradução e transição. Essa política pode recusar alguns endereços especiais roteáveis e não usa uma allowlist de domínios.
+
+Antes de conectar, `dns.lookup` obtém os endereços disponíveis com `all: true`; qualquer resultado não público invalida a consulta inteira. O transporte recebe o IP numérico aprovado como `hostname`, preservando Host e a identidade TLS do domínio original. Não há segunda resolução DNS, reutilização de conexão ou proxy do agente global (`agent: false`), e a validação de certificado permanece habilitada. `http.request`/`https.request` não seguem `Location`.
+
+Um prazo único de 5000 ms cobre DNS, conexão, TLS, cabeçalhos e corpo; uma resolução tardia não inicia nova requisição. O corpo é contado e descartado em streaming, sem armazenar, interpretar ou descomprimir conteúdo remoto. A interface mantém embeds verde/vermelho e os códigos HTTP; exibe somente a origem da URL, sem caminho ou query. Falhas usam uma mensagem fixa, sem erro bruto, corpo, cabeçalhos ou logs. P1.2 acrescentou defer público e continuação da resposta, sem alterar esse helper SSRF ou seus testes; [R07](KNOWN_RISKS.md#r07) foi corrigido no escopo local.
+
+As faixas devem ser revistas quando os registros especiais [IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) e [IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/) da IANA mudarem. A semântica de agentes e proxies usada aqui está na [documentação HTTP do Node 24](https://nodejs.org/docs/latest-v24.x/api/http.html).
+
+## Estado e acoplamentos
+
+- `/todo` mantém Maps por usuário e contexto: servidor+usuário ou DM+usuário, independente do canal de DM. As três operações exigem contexto válido, sem fallback global; respostas e anexos são efêmeros, erros/logs não reproduzem tarefas. Cotas de 100 tarefas/64 KiB são agregadas por usuário entre contextos; 8 MiB/1024 usuários continuam globais, sem expulsão silenciosa. Decisão em [ADR 0002](decisions/0002-privacidade-e-isolamento-do-todo.md). `/timer` conserva usuário+servidor ou usuário+canal de DM, conforme [ADR 0001](decisions/0001-isolamento-dos-timers.md).
+- Operações de `/todo` validam e admitem inserções ou removem estado sincronamente, antes do await do envio. A lista devolvida é cópia defensiva; remoção libera contadores/contextos/usuário vazios. Falha de confirmação mantém o efeito local. Todo estado operacional permanece exclusivamente em memória: reiniciar apaga tarefas, timers e cooldowns, sem sincronização entre processos, replay ou recuperação de estado após falha de hospedagem. Essa perda é conhecida e aceita no [ADR 0003](decisions/0003-estado-operacional-temporario.md); R09 continua `MITIGATED`, com volatilidade deliberada e proteções de privacidade/isolamento preservadas. Persistência não é pendência técnica: bancos, arquivos de estado e dependências/infraestrutura para esse fim não devem ser introduzidos sob a política vigente. Não há migração automática da antiga lista global para contextos inferidos.
+- `/timer` aceita 1–1440 minutos inteiros sem coerção. O scheduler e relógio são injetáveis; cada entry tem identidade própria. Substituição válida agenda antes de cancelar o anterior; cancelamento/expiração removem o estado e callbacks obsoletos não afetam o novo timer. O aviso não é reenviado e um envio já iniciado não é cancelado retroativamente. Falha da confirmação mantém o efeito local.
+- `/qrcode` gera PNG em Buffer por execução; anexos de texto extensos também são Buffers, sem escrita/cwd/cleanup. [content-limits.js](../../lib/content-limits.js) valida limites individuais/agregados e preserva conteúdo completo em anexo; [todo-store.js](../../lib/todo-store.js) limita texto/cardinalidade das listas. Políticas em [COMMANDS](COMMANDS.md).
+- Runtime e registro importam todos os módulos pelo mesmo catálogo: uma dependência ausente bloqueia a preparação inteira com erro sanitizado, antes de login/PUT. A validação não isola efeitos arbitrários no topo de módulos JavaScript.
+- `/docs` e seu handler consomem o mesmo catálogo de documentação; `index.js` apenas delega o select específico. `/help` deriva dinamicamente nomes e descrições da Collection de comandos carregados, sem consultar o registro remoto.
+- Cores, rodapés e mensagens continuam locais. A P3.2 concentra somente identidade/convite e links top.gg/Lofi em config.js; catálogos de documentação, APIs e demais links mantêm suas responsabilidades.
+
+Oportunidades **propostas, sem implementação adicional nesta tarefa**: ampliar governança de contratos/quota externos e avaliar encerramento geral conforme necessidade. O estado temporário é uma decisão estabelecida, não uma pendência de retenção/persistência; mudá-la exigiria nova decisão explícita que substitua o ADR 0003. Fontes, assets, configuração/credenciais e mensagens já entregues ao Discord não são um mecanismo de persistência do estado operacional do bot. A sequência sugerida está em [ROADMAP.md](ROADMAP.md); não representa aprovação automática. R04/R08/R13 e demais correções são avaliados no escopo local das evidências de [QUALITY_GATES](QUALITY_GATES.md), sem certificar operação remota.

@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { respond } = require("../lib/interactions");
 
 const exampleEmbed = new EmbedBuilder()
 	.setColor('#ff9c00')
@@ -35,6 +36,6 @@ module.exports = {
         .setDescription("Relembre comandos do Git"),
 
     async execute(interaction) {
-        await interaction.reply({ embeds: [exampleEmbed] });
+        await respond(interaction, { embeds: [exampleEmbed] });
     }
 }
