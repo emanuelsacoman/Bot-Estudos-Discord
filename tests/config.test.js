@@ -23,12 +23,16 @@ function failsWith(code) {
   };
 }
 
-test("runtime exige somente TOKEN e devolve configuração mínima", () => {
+test("runtime aceita identidade ausente mas valida CLIENT_ID quando configurado", () => {
   assert.deepEqual(readConfig({ TOKEN: FAKE_TOKEN }), { token: FAKE_TOKEN });
-  assert.deepEqual(
-    readConfig({ TOKEN: FAKE_TOKEN, CLIENT_ID: "invalid-ignored" }),
-    { token: FAKE_TOKEN },
+  assert.throws(
+    () => readConfig({ TOKEN: FAKE_TOKEN, CLIENT_ID: "invalid-ignored" }),
+    failsWith("CLIENT_ID_INVALID"),
   );
+  assert.deepEqual(readConfig({ TOKEN: FAKE_TOKEN, CLIENT_ID }), {
+    token: FAKE_TOKEN,
+    clientId: CLIENT_ID,
+  });
 });
 
 test("TOKEN é tratado como valor opaco sem exigir partes JWT ou decodificação", () => {

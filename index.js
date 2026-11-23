@@ -24,7 +24,6 @@ function configureClient(client, catalog) {
     {
       name: "🗳️ Vote no top.gg",
       type: ActivityType.Watching,
-      link: "https://top.gg/bot/1193011045577523300",
     },
     {
       name: "👨‍💻 Explorando novas linguagens",
@@ -45,12 +44,10 @@ function configureClient(client, catalog) {
     {
       name: "🚀 Lançando atualizações",
       type: ActivityType.Watching,
-      link: "https://github.com/emanuelsacoman/CodeBucket-website",
     },
     {
       name: "🎵 Encontrando inspiração em músicas",
       type: ActivityType.Listening,
-      link: "https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H?si=0948ff034a394fba",
     },
     {
       name: "📚 Aprendendo novos frameworks",
@@ -59,12 +56,10 @@ function configureClient(client, catalog) {
     {
       name: "💻 Codificando novas funcionalidades",
       type: ActivityType.Watching,
-      link: "https://github.com/emanuelsacoman/CodeBucket-website",
     },
     {
       name: "🔍 Descobrindo novos comandos",
       type: ActivityType.Watching,
-      link: "https://codebucketweb.web.app/comandos",
     },
     {
       name: "🔧 Otimizando desempenho",

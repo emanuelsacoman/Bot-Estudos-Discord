@@ -4,6 +4,8 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 
 ## Regras comuns
 
+**Atualização P3.2 — R12, 2026-11-23, base `develop/3ecdd7c`:** identidade e links públicos passam à configuração compartilhada. `/invite` deriva o convite da aplicação da própria interação, confronta `CLIENT_ID` quando configurado e recusa divergência sem botão/URL. O convite histórico para aplicação fixa deixa de ser fallback. A página histórica de `/vote` permanece um recurso externo independente. Os 23 contratos slash permanecem preservados; evidências atuais em [QUALITY_GATES](QUALITY_GATES.md). P3.1 está commitada nessa base; referências anteriores a trabalho sem commit são registros históricos.
+
 **Atualização P1.1 — 2026-11-07, base `develop` / `49138e6`:** `/status` passou a usar transporte seguro do Node; contratos slash dos 23 comandos continuam idênticos ao P0. Suíte permanente de SSRF/interação simulada e carregamento passa offline; resultados e limites em [QUALITY_GATES](QUALITY_GATES.md).
 
 **Atualização P1.2 — 2026-11-07, base `develop` / `234f01b`:** todos os comandos passaram a usar a continuação compartilhada de respostas. Operações HTTP, formatação e geração/envio de arquivos têm reconhecimento prévio; nomes, opções, mensagens e visibilidade dos ramos existentes foram preservados. A P1.2 foi commitada em `a79f13a`.
@@ -27,6 +29,57 @@ Auditoria inicial de 2026-11-07, código-base `cea09b90889716b5b05139eaf06f8b0e8
 - Os seis comandos de APIs usam prazo total de **5000 ms** via [http-client.js](../../lib/http-client.js), incluindo leitura do JSON de `/github`, agora com corpo até 1 MiB antes do parse; `/status` mantém seu prazo e todas as proteções SSRF próprias. Não há retry automático. Falhas HTTP são convertidas em erros classificados sem corpo, URL ou configuração remota. P2.4 acrescenta JSON estrito, validação de status, zero redirects e pausas temporárias para limites de serviço, sem esperar ou reenviar a operação.
 - O listener trata erros conforme o estado da interação, sem repetir envios que falharam ou já foram reportados. Expiração local (3 s sem reconhecimento ou 15 min para interação reconhecida, desde a criação) e códigos terminais impedem novo envio. O erro central inicial continua público; depois do reconhecimento herda a visibilidade estabelecida. Reações usam `runSecondary`; QR agora usa somente Buffer sem exclusão; o manager de timers captura seu próprio envio tardio depois de remover o estado. Consulte [KNOWN_RISKS.md](KNOWN_RISKS.md).
 - Todos dependem de `discord.js`, incluindo o builder de `/translate` desde a P2.4. Permissões de acesso ao canal, envio, embeds, anexos e reações devem ser verificadas conforme o recurso usado. Os builders não impõem permissões administrativas ou restrição explícita a servidores.
+
+## Links públicos revisados — P3.2
+
+| Referência | URL pública existente e tratamento |
+| --- | --- |
+| `/invite` | `https://discord.com/oauth2/authorize`, ID da aplicação atual; URL gerada/validada por config.js, sem ID histórico de fallback. |
+| `/vote` | `https://top.gg/bot/1193011045577523300`, preservada em PUBLIC_LINKS; página externa histórica, independente de CLIENT_ID. |
+| `/lofiradio` | `https://lofiradio.web.app`, preservada em PUBLIC_LINKS; override público HTTPS validado, sem query/fragmento/credenciais. |
+| Presença: site/comandos | `https://codebucketweb.web.app/comandos`, referência histórica preservada neste inventário; o campo link não tinha efeito no SDK e foi removido. |
+| Presença: projeto do site | `https://github.com/emanuelsacoman/CodeBucket-website`, referência histórica preservada neste inventário; o campo link não tinha efeito no SDK e foi removido. |
+| Playlist | `https://open.spotify.com/playlist/3FbsZmt8BrFFmVpKD4ju4H`; /playlist mantém o link existente com parâmetro público de compartilhamento si. Na presença, o campo link sem efeito foi removido. |
+| Autor | `https://github.com/emanuelsacoman`; avatar `https://avatars.githubusercontent.com/u/63565495?v=4`. Esse ID pertence ao GitHub, não ao Discord. |
+| Ícone de rodapé | `https://cdn-icons-png.flaticon.com/512/190/190544.png`, recurso estático público preservado; não é identidade de aplicação. |
+
+Não houve consulta funcional a esses destinos. A validação local cobre sintaxe/política dos links configuráveis e construção dos botões, sem comprovar disponibilidade, propriedade ou destino após redirecionamento. Documentação e APIs têm catálogos/contratos próprios preservados. Não se centralizam rodapés ou outros dados sem necessidade de coerência em R12.
+
+## Matriz de recursos e permissões — P3.2
+
+Todos os 23 comandos respondem por interação. `reply`, `editReply` e `followUp` usam o protocolo/token da interação; não são equivalentes ao envio comum `channel.send`. A coluna de permissões abaixo associa recursos ao modelo operacional de canais de texto e ao convite, sem afirmar que toda resposta de interação exige `SendMessages` pela mesma rota do timer. Conferir permissões efetivas e sobrescritas no servidor real continua necessário. [Respostas oficiais de interação](https://docs.discord.com/developers/interactions/receiving-and-responding).
+
+Legenda: **V** = `ViewChannel`; **S** = `SendMessages` para envio comum; **E** = `EmbedLinks`; **A** = `AttachFiles`; **R** = `ReadMessageHistory` + `AddReactions` para reações novas. E/A indicam os recursos do payload. **A condicional** é fallback integral de conteúdo extenso, e não corte do resultado.
+
+| Comando | Recursos enviados | Permissões/condições pertinentes |
+| --- | --- | --- |
+| `/autor` | Embed, botão e três reações Unicode | V, E, R |
+| `/count` | Embed | V, E |
+| `/docs` | Embed/menu e resposta textual à seleção | V, E; usuário pode usar comandos/componentes |
+| `/exercise` | Embed ou anexo de texto | V, E; A condicional |
+| `/formatar` | Embed ou anexo de código | V, E; A condicional |
+| `/git` | Embed | V, E |
+| `/github` | Embed ou anexo de texto | V, E; A condicional |
+| `/help` | Embed; helper admite anexo se exceder limites | V, E; A condicional |
+| `/http` | Embed; helper admite anexo se exceder limites | V, E; A condicional |
+| `/invite` | Embed, botão OAuth2 e reação Unicode | V, E, R; identidade coerente |
+| `/lofiradio` | Embed, botão e dois anexos locais | V, E, A; sem áudio/voz |
+| `/moeda` | Embed | V, E |
+| `/ping` | Texto efêmero e edição da própria resposta | Interação válida; sem embed/anexo |
+| `/playlist` | Embed, follow-up textual e reação Unicode | V, E, R |
+| `/qrcode` | Embed e PNG; possível segundo anexo textual | V, E, A |
+| `/question` | Embed ou anexo de texto | V, E; A condicional |
+| `/repositorys` | Texto ou anexo de texto | V; A condicional |
+| `/servercount` | Embed | V, E |
+| `/status` | Embed | V, E |
+| `/timer` | Embed de confirmação e aviso posterior com `channel.send` | V, S, E; thread exige `SendMessagesInThreads` adicional |
+| `/todo` | Texto/embed/anexo, sempre efêmeros | Interação válida; E/A conforme resultado |
+| `/translate` | Texto ou anexo de texto | V; A condicional |
+| `/vote` | Embed, botão top.gg e reação Unicode | V, E, R |
+
+O convite solicita **117824** = `ViewChannel` (1024) + `SendMessages` (2048) + `EmbedLinks` (16384) + `AttachFiles` (32768) + `ReadMessageHistory` (65536) + `AddReactions` (64), cobrindo o conjunto funcional em canais de texto comuns. A rota de reação exige histórico e, para emoji ainda ausente na mensagem, adicionar reações; as quatro implementações usam Unicode. `SendMessagesInThreads` é condicional ao aviso do timer em thread e não integra esse convite; nesse caso, conferir também acesso, associação e estado da thread. Não se solicitam poderes administrativos, gestão de mensagens/webhooks, emojis externos ou voz. [Permissões](https://docs.discord.com/developers/topics/permissions), [rota de reação](https://docs.discord.com/developers/resources/message#create-reaction).
+
+`bot` e `applications.commands` são scopes OAuth2 do convite. `UseApplicationCommands` é permissão do usuário para invocar no canal e não deve ser acrescida ao bitfield do bot por confusão com o scope. Os builders não proíbem DM; nenhum comando inicia conversa privada espontaneamente. Respostas efêmeras não são DMs. Em DM, configurações de privacidade/acesso e a existência do canal influem; não se aplicam os mesmos cargos/sobrescritas de servidor. `/timer` recusa canal indisponível sem fallback. O único intent continua `Guilds`: nenhuma leitura de mensagens, eventos de reação ou membros exige ampliar intents neste incremento. [OAuth2 oficial](https://docs.discord.com/developers/topics/oauth2#bot-authorization-flow).
 
 ## Limites e mudanças P2.1
 
@@ -203,17 +256,19 @@ Entrada inválida, limite real do serviço, indisponibilidade e falha inesperada
 
 **Fonte:** [invite.js](../../commands/invite.js). **Opções:** nenhuma.
 
-Exibe embed e botão OAuth com `process.env.INVITE_URL` ou fallback público com aplicação `1193011045577523300`, `permissions=0` e scopes `bot applications.commands`; adiciona reação de coração.
+Exibe embed e botão OAuth2 para a aplicação identificada por `interaction.applicationId`; `CLIENT_ID`, quando presente, precisa corresponder. Na ausência da identidade da interação, aceita o `CLIENT_ID` válido como fonte explícita; se não houver identidade ou ocorrer divergência, responde efemeramente com mensagem fixa sem URL. Adiciona reação de coração após o envio bem-sucedido.
 
-**Erros e limites:** o fallback não deriva de `CLIENT_ID` e pode apontar para outra aplicação. Permissões zero na URL não garantem os recursos de anexos e reações. URL inválida pode falhar antes da resposta; a reação posterior é protegida por `runSecondary`, sem nova mensagem de erro ao usuário. O bot apenas compartilha o link, sem alterar instalação remota nesta execução.
+**Erros e limites:** `INVITE_URL` vazio gera URL canônica `https://discord.com/oauth2/authorize` com `client_id` da identidade validada, `permissions=117824` e scopes exatos `bot applications.commands`. URL explícita aceita somente HTTPS em `discord.com`, caminho `/oauth2/authorize` ou `/api/oauth2/authorize`, exatamente os três parâmetros únicos e valores coerentes, sem credenciais, porta, fragmento ou extras. Convites legados com permissões zero precisam ser substituídos pelo gerado; não há fallback histórico silencioso. Erros não ecoam configurações/tokens. Reação posterior usa `runSecondary`, sem nova resposta em caso de falha. Compartilhar o link não instala o bot nem altera permissões remotas.
 
 ### `/lofiradio`
 
 **Fonte:** [lofiradio.js](../../commands/lofiradio.js). **Opções:** nenhuma.
 
-Usa `process.env.LOFIRADIO_URL` ou `https://lofiradio.web.app`, prepara embed com botão e anexa [lofiicon.png](../../images/lofiicon.png) e [lofiradio.jpeg](../../images/lofiradio.jpeg). Caminhos são montados com `path` e `__dirname`; defer público precede o envio dos anexos.
+Usa `LOFIRADIO_URL` validada pela configuração compartilhada ou `https://lofiradio.web.app`, prepara embed com botão e anexa [lofiicon.png](../../images/lofiicon.png) e [lofiradio.jpeg](../../images/lofiradio.jpeg). Caminhos são montados com `path` e `__dirname`; defer público precede o envio dos anexos. A configuração admite somente HTTPS com hostname DNS público bem formado, até 512 caracteres, sem credenciais, query, fragmento, controles/espaços, barra invertida, percent-encoding malformado, host local ou IP literal.
 
-**Erros e limites:** apenas compartilha um site externo; não transmite áudio e não entra em canal de voz. Depende dos dois arquivos e da permissão de anexar/mostrar embeds. Falha ao preparar o conteúdo gera erro efêmero antes do defer; falha no envio não provoca uma segunda mensagem. Disponibilidade e estações do site não foram verificadas.
+Parênteses e colchetes do caminho são codificados para manter o destino íntegro no Markdown, embed e botão; o limite de 512 também é conferido após normalizar/codificar.
+
+**Erros e limites:** apenas compartilha um site externo; não transmite áudio e não entra em canal de voz. Depende dos dois arquivos e da permissão de anexar/mostrar embeds. Falha de configuração/preparação gera erro efêmero sanitizado antes do defer; falha no envio não provoca uma segunda mensagem. A validação é sintática e não resolve DNS, testa disponibilidade, propriedade ou conteúdo remoto. Não substitui a proteção SSRF de `/status`, que continua intacta. Disponibilidade e estações do site não foram verificadas.
 
 ### `/moeda`
 
@@ -315,9 +370,9 @@ Entrada inválida, tradução vazia/inesperada, pedido/acesso recusado, limite, 
 
 **Fonte:** [vote.js](../../commands/vote.js). **Opções:** nenhuma.
 
-Envia embed, botão para `https://top.gg/bot/1193011045577523300` e reação de estrela. Não consulta API top.gg e não confirma se o usuário votou.
+Envia embed, botão para a página histórica `https://top.gg/bot/1193011045577523300`, centralizada em `PUBLIC_LINKS.vote`, e reação de estrela. Não consulta API top.gg e não confirma se o usuário votou.
 
-**Erros e limites:** aplicação no link é fixa, independente de `CLIENT_ID`. A reação depende de permissões e é protegida por `runSecondary`; falha posterior não provoca nova resposta. Disponibilidade da página `NOT_CONFIRMED`.
+**Erros e limites:** a página externa é independente da identidade Discord da instância e não gera convites. Seu ID histórico é preservado; uma instância com outro `CLIENT_ID` não implica que exista uma página top.gg correspondente. A reação depende de permissões e é protegida por `runSecondary`; falha posterior não provoca nova resposta. Disponibilidade/propriedade atual da página permanecem `NOT_CONFIRMED`.
 
 ## Continuidade
 

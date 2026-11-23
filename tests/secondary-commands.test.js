@@ -46,6 +46,7 @@ function interactionFor({
   };
   const interaction = {
     events,
+    applicationId: "123456789012345678",
     user: { id: "usuario-de-teste" },
     client: { guilds: { cache: { size: 2 } } },
     createdTimestamp: Date.now(),

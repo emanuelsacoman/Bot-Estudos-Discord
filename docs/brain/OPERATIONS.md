@@ -1,6 +1,8 @@
 # Operação e recuperação
 
-Atualizado na **P3.1 — R17, 2026-11-14**, base `develop/7499426` (P2.5 já commitada). Evidências históricas e validação atual em [QUALITY_GATES](QUALITY_GATES.md). O [ADR 0003](decisions/0003-estado-operacional-temporario.md) mantém estado operacional em memória e perda após reinício aceita. P2.4 tratou contratos/falhas e pausas temporárias das APIs, sem retry. P2.5 revisa a confiança no carregamento e preserva código, testes, dependências, credenciais e infraestrutura; os gates executados estão registrados em qualidade: baseline/final 1097/1097, sintaxe 59/59, 23 contratos/hash preservados e 28 probes de importação aprovados. P3.1 reduz dados em logs e protege diagnósticos contra falha de saída; P3.1 `DONE` offline: suíte 1189/1189, sanitização 103/103, sintaxe 62/62 e 23 contratos/hash preservados, sem dependências novas. Evidências em qualidade. R17 `MITIGATED`, com captura/retenção/histórico externos `NOT_CONFIRMED`. Node 24.22.2/npm 11.19.1; login/PUT reais, hospedagem e recuperação continuam `NOT_CONFIRMED`. Os exemplos usam PowerShell a partir da raiz.
+Atualizado na **P3.2 — R12, 2026-11-23**, base `develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18`, árvore limpa no início. P3.1 já está commitada nessa base; resultados anteriores são históricos em [QUALITY_GATES](QUALITY_GATES.md). A P3.2 valida identidade/convites/URLs e prepara o procedimento Windows sem login, registro global ou alterações remotas. R12 permanece **MITIGATED** pelas verificações Discord ainda pendentes. O [ADR 0003](decisions/0003-estado-operacional-temporario.md) mantém estado exclusivamente em memória e perda após reinício aceita; R17 preserva diagnósticos mínimos e retenção externa `NOT_CONFIRMED`. Os exemplos usam PowerShell na raiz; a execução do bot e o registro continuam ações separadas que exigem autorização explícita.
+
+Evidências P3.2: suíte **1266/1266**, focais R12 **77/77**, dry-run com **23 comandos/exit 0**, instalações limpas normal/produção **85 pacotes/exit 0** cada e 23 contratos/hash preservados em ambas. Esses resultados offline não verificam login, aplicação/token associados, permissões, páginas externas ou disponibilidade da hospedagem; detalhes e limites em qualidade.
 
 ## Preparar Node.js e dependências
 
@@ -13,23 +15,43 @@ node --version
 npm --version
 ```
 
-### Recuperação local sem alterar configuração global
+### Diagnóstico Windows/NVM — P3.2
 
-O ambiente Windows possui NVM `2.0.1-hotfix.6`, em modo shim: o PATH aponta para proxies em `.nodejs`, que é uma junction para `.shim`. Só Node 20.20.0 estava instalado, com padrão `vnone`, `auto_use=true` e `auto_install=false`. Portanto não havia uma versão instalada/selecionada correspondente ao projeto. O `--local` de `nvm use` desse gerenciador seleciona versões locais e pode alterar o padrão; não significa ativação só na sessão. Nenhuma alteração de padrão, Registro ou PATH persistente foi feita.
+Em 23/11/2026, `.nvmrc` continua `24.22.2`. A mensagem histórica “Node.js v24.22.2 is not installed or cannot be found” descrevia uma instalação ausente na Fase 1; não corresponde integralmente ao ambiente atual. Foram executados `node --version`, `npm --version`, `nvm list`, `nvm --version` e resolução por `Get-Command`. Resultados atuais:
 
-Na Fase 1 foi baixado o ZIP Windows x64 **Node 24.22.2** de `nodejs.org`, com SHA-256 conferido contra `SHASUMS256.txt` oficial, e extraído em `node_modules/.codebucket-p0/runtime/node-v24.22.2-win-x64`. Runtime, caches e cópias de teste são locais e ignorados pelo Git; não substituem uma instalação gerenciada em outra máquina. A área fica dentro do `node_modules` original, preservado nesta fase: **não execute `npm ci` na raiz usando esse binário**, pois o comando remove o diretório que o contém. Para instalar na raiz, use um runtime instalado fora do `node_modules` alvo.
+| Verificação | Resultado observado |
+| --- | --- |
+| `node --version` | `v24.22.2` pelo shim |
+| `nvm list` | `24.22.2` e `20.20.0` instalados |
+| `nvm --version` | `v2.0.1-hotfix.6` |
+| Resolução PowerShell | `node.exe`/`npm.exe` em `C:\Users\Emanuel\AppData\Local\Author Software\nvm\.nodejs`; NVM no diretório pai |
+| Runtime fora de `node_modules` | `C:\Users\Emanuel\AppData\Local\Author Software\nvm\installs\v24.22.2\node.exe` existe e executa a versão esperada |
+| `npm --version` pelo shim | Bloqueado por **NVM4306**, script delegado `npm-cli.js` não confiável; não foi executado diretamente para contornar o bloqueio |
+| Metadados do npm instalado | `11.19.1`; ler metadados não comprova execução da CLI |
+| Área portátil P0 antiga | `node_modules/.codebucket-p0/` ausente; os caminhos antigos são apenas históricos |
 
-Para conferir o runtime portátil existente sem acionar o shim:
+O gerenciador instalado é NVM Windows **v2**, com shims, resolução por projeto e controle de confiança; receitas de outras implementações de NVM não são automaticamente compatíveis. A falha atual é de confiança do launcher npm, distinta de ausência/seleção do Node. Também houve aviso de escrita negada no marcador de bootstrap do Registro durante consulta; nenhuma configuração persistente foi alterada. A origem exata da divergência de confiança não foi estabelecida (`NOT_CONFIRMED`). A [documentação do NVM v2](https://docs.nvm-windows.com/features/newv2/) e a [política do firewall](https://docs.nvm-windows.com/features/firewall/) distinguem esses mecanismos. Reparar/reinstalar a versão gerenciada ou mudar confiança exige verificar integridade e autorização específica; não foi feito nesta tarefa.
+
+### Runtime independente verificado, sem alterar o NVM
+
+A P3.2 baixou uma distribuição oficial independente Windows x64, fora de qualquer `node_modules`, em `C:\Users\Emanuel\AppData\Local\Temp\CodeBucket-p32-runtime-20261123\node-v24.22.2-win-x64`. SHA-256 do ZIP: `CA1BFF5D8EAD13C9F2EA404A176DB46BD430704D5B5113734049FA365E7799E2`, conferido com o `SHASUMS256.txt` da [distribuição oficial v24.22.2](https://nodejs.org/dist/v24.22.2/). Esse runtime e seu próprio npm foram executados: **Node v24.22.2/npm 11.19.1**. Não se reutilizou o script npm bloqueado do NVM, não se desativou proteção e não se alterou confiança, padrão global, Registro ou PATH persistente.
+
+A pasta temporária pode ser removida pelo sistema. Se ausente, obtenha novamente o ZIP da versão exata no endereço oficial, compare `Get-FileHash -Algorithm SHA256` com a entrada exata de `SHASUMS256.txt` e extraia em diretório local fora do `node_modules` que será instalado. Não execute um arquivo cuja integridade divergir. Para usar a cópia verificada existente nesta máquina:
 
 ```powershell
-$runtimeRoot = Join-Path (Get-Location).Path 'node_modules/.codebucket-p0/runtime/node-v24.22.2-win-x64'
-$nodeRuntime = Join-Path $runtimeRoot 'node.exe'
-$npmCli = Join-Path $runtimeRoot 'node_modules/npm/bin/npm-cli.js'
+$codeBucketRuntime = Join-Path $env:TEMP 'CodeBucket-p32-runtime-20261123/node-v24.22.2-win-x64'
+$nodeRuntime = Join-Path $codeBucketRuntime 'node.exe'
+$npmCli = Join-Path $codeBucketRuntime 'node_modules/npm/bin/npm-cli.js'
+if (-not (Test-Path -LiteralPath $nodeRuntime)) {
+    throw 'Runtime local ausente. Prepare a distribuicao oficial verificada antes de continuar.'
+}
 & $nodeRuntime --version
-& $nodeRuntime --preserve-symlinks --preserve-symlinks-main $npmCli --version
+& $nodeRuntime $npmCli --version
+# Somente este processo PowerShell; permite aos filhos do npm encontrar o mesmo Node.
+$env:PATH = "$codeBucketRuntime;$env:PATH"
 ```
 
-O sandbox encontrou `EPERM ... lstat` em ancestral na auditoria inicial. Foram mantidas as flags `--preserve-symlinks --preserve-symlinks-main` nos checks para contornar resolução de caminhos; não são requisito de hospedagem. Quando necessário para filhos do npm, PATH e `NODE_OPTIONS` foram definidos somente no processo PowerShell do teste. Não foram modificadas variáveis persistentes nem o NVM global.
+Esse procedimento se aplica à distribuição independente cuja integridade foi verificada; não é instrução para ignorar uma recusa do firewall do NVM. O `--local` de `nvm use` não deve ser interpretado como alteração restrita à sessão. O sandbox encontrou `EPERM ... lstat` em ancestrais em fases anteriores; flags `--preserve-symlinks --preserve-symlinks-main` foram usadas nos respectivos testes e não são requisito de hospedagem.
 
 ### Instalação reproduzível
 
@@ -44,6 +66,8 @@ Para instalação de produção, em **outra cópia limpa**:
 ```powershell
 npm ci --omit=dev --engine-strict
 ```
+
+Na sessão configurada acima, os equivalentes explícitos são `& $nodeRuntime $npmCli ci --engine-strict` e, em outra cópia limpa, `& $nodeRuntime $npmCli ci --omit=dev --engine-strict`. Não execute instalação usando um runtime contido no `node_modules` do próprio alvo, porque `npm ci` o recria. As instalações desta entrega e suas limitações estão em [QUALITY_GATES](QUALITY_GATES.md).
 
 As duas variantes foram executadas com sucesso na Fase 1, cada uma instalando 85 pacotes. Prettier `^3.5.3` agora está em `dependencies`, mantendo a versão travada `3.5.3`; a omissão de dev não remove mais o pacote requerido por [formatar.js](../../commands/formatar.js). Os outros pacotes não foram atualizados/removidos. `node-fetch` sem uso encontrado foi preservado. O import transitivo de `@discordjs/builders`, registrado historicamente, foi substituído em `/translate` por `discord.js` na P2.4, sem mudar versões/manifest/lock.
 
@@ -86,15 +110,50 @@ Preencha os valores localmente em editor seguro ou injete-os pelo gerenciador de
 | Variável | Necessidade e origem | Comportamento existente |
 | --- | --- | --- |
 | `TOKEN` | Obrigatória para login e registro confirmado. Token do bot no Discord Developer Portal; dry-run não a exige. | [config.js](../../lib/config.js) normaliza prefixo `Bot`/`Bearer` e valida antes de Client/REST: valor opaco de 20–512 caracteres ASCII alfanuméricos ou `_ . -`, sem placeholders, espaços ou formas evidentemente inválidas. Não imprime nem valida a credencial online. |
-| `CLIENT_ID` | Obrigatória somente para registro confirmado. Application ID da mesma aplicação do token; identificador público. | String decimal de 17–20 dígitos, sem zero inicial e até o máximo de uint64. Define `Routes.applicationCommands(CLIENT_ID)`; o login do runtime não a exige. |
-| `INVITE_URL` | Opcional, URL OAuth pública completa da aplicação pretendida. | Ausente/vazia usa fallback com ID fixo `1193011045577523300`, `permissions=0` e scopes `bot applications.commands`; não deriva de CLIENT_ID. |
-| `LOFIRADIO_URL` | Opcional, URL pública válida HTTP(S). | Ausente/vazia usa `https://lofiradio.web.app`; apenas gera link/embed/botão. |
+| `CLIENT_ID` | Opcional no runtime; obrigatória para registro confirmado. Application ID da mesma aplicação do token; identificador público. | Se preenchida, sempre exige decimal canônico de 17–20 dígitos, sem zero inicial e até uint64. `/invite` confronta com `interaction.applicationId`; divergência produz aviso privado sem URL. O registro usa `Routes.applicationCommands(CLIENT_ID)`. |
+| `INVITE_URL` | Opcional; prefira vazia para geração do convite da aplicação atual. | HTTPS em `discord.com`, authorize em `/oauth2/authorize` ou `/api/oauth2/authorize`, exatamente `client_id`, `permissions=117824` e scopes `bot applications.commands`, únicos e coerentes. Sem parâmetros extras, credenciais, porta ou fragmento. Ausente/vazia não usa ID histórico. |
+| `LOFIRADIO_URL` | Opcional, link público HTTPS de até 512 caracteres. | Vazia usa `https://lofiradio.web.app`. Exige hostname DNS público bem formado; recusa credenciais, query, fragmento, controles/espaços, barra invertida, percent-encoding malformado, host local e IP literal. Normaliza parênteses/colchetes para uso seguro em Markdown e mantém o limite após codificar. Apenas gera link/embed/botão. |
 
-Essas são **as quatro variáveis de configuração da aplicação**; não há `GUILD_ID` nem chaves de APIs externas implementadas. `NODE_ENV` e configurações de ferramentas não são contratos da aplicação. A presença de valores locais foi registrada na auditoria inicial, sem comprovar validade. A validação P1.3 é estrutural e conservadora: não decodifica token, não prova associação TOKEN/CLIENT_ID, permissões ou existência remota da aplicação.
+Essas são **as quatro variáveis de configuração da aplicação**; não há `GUILD_ID` nem chaves de APIs externas implementadas. `NODE_ENV` e configurações de ferramentas não são contratos da aplicação. `readConfig` valida TOKEN, CLIENT_ID opcional e URLs configuradas antes de criar Client/login; falhas têm mensagens fixas sem valores. A validação é estrutural: não decodifica token, não prova associação TOKEN/CLIENT_ID ou disponibilidade/propriedade de site. O confronto da identidade efetiva só ocorre quando existir uma interação real. Parâmetros de URL podem conter segredos; por isso a rádio não admite query/fragmento e o convite admite somente seus três campos públicos. A `.env` existente não é sobrescrita nem exibida nesta preparação.
 
-O Client solicita somente `GatewayIntentBits.Guilds`. Não há necessidade demonstrada pelo código de ativar intents privilegiadas para mensagens/membros. Confira a instalação OAuth da aplicação com scopes `bot` e `applications.commands`, acesso ao canal e permissões dos recursos usados: ver canal, enviar mensagens, embeds, anexar arquivos e adicionar reações; leitura do histórico pode ser necessária para reações. Não conceda Administrator como substituto dessa conferência. As permissões efetivas não foram consultadas.
+O Client solicita somente `GatewayIntentBits.Guilds`; não há necessidade técnica identificada de ampliar intents. O convite pede scopes `bot` e `applications.commands` e **117824**, cobrindo ver canal, enviar mensagens comuns, embeds, anexos, histórico e novas reações. Conferir cargos/sobrescritas efetivos e permissão do usuário de usar comandos; o bitfield do convite não supera uma negativa de canal. A [matriz dos 23 comandos](COMMANDS.md#matriz-de-recursos-e-permissões--p32) diferencia respostas de interação, o `channel.send` do timer, reações, anexos e DM. Threads podem exigir `SendMessagesInThreads` para o aviso do timer; o convite-base destina-se a canais de texto comuns. Não pede Administrator.
 
-O fallback `permissions=0` não garante esses recursos em todos os canais. A recuperação de uma aplicação própria exige revisar a URL de convite e os IDs fixos de top.gg/presença, em tarefa autorizada; não copie o token de outra aplicação.
+A página top.gg histórica `https://top.gg/bot/1193011045577523300` é um link externo preservado, independente da identidade Discord da instância. Não se substitui seu ID com base em `CLIENT_ID`; isso inventaria uma página não verificada. As URLs da rádio/site/GitHub/playlist permanecem legítimas referências históricas, sem atestado de disponibilidade. Campos `link` da presença eram ignorados pelo SDK e foram removidos; a rotação continua com nome/tipo, sem promessa de links clicáveis ou transformação em streaming. Uma URL sintaticamente aceita não equivale a serviço online, domínio confiável ou proteção SSRF; nenhum desses links é consultado pela validação local.
+
+### Preparação neste computador — sequência pronta
+
+**Pendência local comprovada:** a leitura offline e sanitizada de `.env` na P3.2 encontrou `INVITE_URL` incompatível com a política atual. Nenhum valor foi exibido ou alterado. Antes de iniciar, abra `.env` localmente e deixe **`INVITE_URL=` vazia**, para gerar o convite da identidade atual. Preserve TOKEN e CLIENT_ID e confira a correspondência manualmente no Developer Portal; não copie valores para chat/logs. A instalação e os testes offline não significam que a configuração local já permita iniciar.
+
+CLIENT_ID e LOFIRADIO_URL locais passaram na validação estrutural individual; uma cópia somente em memória do ambiente com INVITE_URL vazia passou em `readConfig`. Isso identifica o override do convite como a pendência local observada, sem provar token válido ou correspondência remota e sem alterar `.env`.
+
+1. Na raiz, confira `git status`, `.nvmrc` e esta entrega. Prepare o runtime independente pelo bloco acima; mantenha `$nodeRuntime`, `$npmCli` e PATH somente nessa sessão. As duas versões devem ser `24.22.2`/`11.19.1`.
+2. Instale o lockfile com `& $nodeRuntime $npmCli ci --engine-strict`, usando runtime fora de `node_modules`. Para produção em outra cópia limpa, acrescente `--omit=dev`. A P3.2 executou ambas as instalações isoladas: 85 pacotes/exit 0 e 23 contratos/hash preservados; isso não executa Discord nem substitui a instalação da raiz.
+3. Crie `.env` pelo bloco seguro anterior somente se ausente. Em editor local, preserve o token existente, confirme o Application ID da mesma aplicação e esvazie o convite incompatível. Não altere credenciais por tentativa de diagnóstico.
+4. Valide estrutura/configuração local sem rede ou impressão de valores:
+
+   ```powershell
+   & $nodeRuntime -e "try { require('dotenv').config(); require('./lib/config').readConfig(process.env); console.log('Configuracao local valida.'); } catch { console.error('Configuracao local invalida. Revise .env sem compartilhar valores.'); process.exitCode = 1; }"
+   ```
+
+5. Rode `& $nodeRuntime $npmCli test` e `& $nodeRuntime deploy-commands.js --dry-run`. O dry-run deve confirmar 23 comandos; não lê `.env`, não verifica token/identidade/permissões e não registra nada.
+6. No Developer Portal, confira visualmente Application ID e bot correspondente ao token armazenado, sem gerar/rotacionar token. No servidor, confira a instalação existente, scopes `bot applications.commands`, cargos e sobrescritas dos canais de teste conforme a matriz. Não registre de novo só por reinstalar dependências ou mudar de máquina.
+7. **Somente após autorização explícita para login local**, execute `& $nodeRuntime index.js` na raiz. Esse comando inicia conexão real. Não execute `--confirm-global-replacement` nesta preparação.
+8. Confira mensagens sanitizadas de pronto/total e a resposta a `/ping`; siga o checklist abaixo. Em erro, anote somente classe operacional, momento aproximado, versão e resultado, sem token, `.env`, stack bruto, URL de webhook ou dump de interação.
+9. Ao terminar a instância autorizada, use `Ctrl+C` no terminal e confira que o processo encerrou. Estado volátil se perde; não há recuperação de tarefas/timers/cooldowns após parar.
+10. Para futura hospedagem gratuita, use os requisitos abaixo e valide as condições reais do provedor antes de publicar. A P3.2 não autoriza deploy, registro global, permissões remotas ou reinício de produção.
+
+### Checklist da primeira validação real autorizada
+
+- [ ] Confirmar que não há outra instância a ser interrompida/substituída e registrar commit/runtime e escopo da autorização, sem credenciais.
+- [ ] Conferir o Application ID no Portal e o `client_id` do botão de `/invite` antes de autorizar qualquer instalação. O botão deve ter scopes `bot applications.commands` e `permissions=117824`; divergência deve produzir aviso privado sem link.
+- [ ] Confirmar ready e `/ping`; conferir 23 comandos disponíveis e `/help`. Ausência remota de slash commands exige diagnóstico separado, sem registro automático.
+- [ ] Testar `/docs` e uma seleção nova; menus antigos não são o contrato atual.
+- [ ] Testar embeds, botões `/vote` e `/lofiradio`, PNG de `/qrcode`, um fallback de texto extenso e as reações de `/autor`, `/invite`, `/vote` e `/playlist`. Conferir identidade da página externa separadamente do convite.
+- [ ] Testar `/timer set` com um minuto e confirmar o aviso no canal; testar `stop`. Se houver necessidade de threads/DM, testar esses contextos separadamente e conferir suas permissões/acesso.
+- [ ] Testar `/todo` com conteúdo não sensível: privacidade, isolamento entre usuários/servidores/DM e remoção; testar `/ping` efêmero. Não usar dados pessoais nos testes.
+- [ ] Testar os demais comandos locais e as seis integrações HTTP em entradas pequenas; registrar indisponibilidade/quota sem loops de retry. `/status` deve continuar recusando destinos proibidos.
+- [ ] Conferir logs sanitizados; em ambiente controlado, verificar falhas de permissão/entrega sem conceder Administrator e sem duplicação de respostas. Qualquer mudança remota de permissão precisa do escopo autorizado.
+- [ ] Encerrar com `Ctrl+C`, registrar resultados e limites em CURRENT/QUALITY_GATES; não declarar identidade, disponibilidade ou permissões integralmente validadas apenas pelo ready.
 
 ## Registrar slash commands — ação remota separada
 
@@ -124,9 +183,9 @@ Depois de preparar/configurar uma instância cuja execução esteja autorizada:
 node index.js
 ```
 
-Não existe script `npm start` declarado; use a entrada explícita. O bootstrap carrega ambiente, valida TOKEN e catálogo e só então cria o Client; os handlers são instalados antes do login, cujo prazo é 30 s. Falha registra mensagem fixa, define `exitCode = 1` e tenta limpar recursos da aplicação e destruir o Client em até 2 s. Um watchdog de 5 s após a falha, com `unref`, força saída de erro se ainda houver recursos ativos. Esse fluxo foi projetado para inicialização, sem reiniciar o bot automaticamente.
+Não existe script `npm start` declarado; use a entrada explícita. O bootstrap carrega ambiente, valida TOKEN, CLIENT_ID quando presente, URLs configuradas e catálogo e só então cria o Client; os handlers são instalados antes do login, cujo prazo é 30 s. Falha registra mensagem fixa, define `exitCode = 1` e tenta limpar recursos da aplicação e destruir o Client em até 2 s. Um watchdog de 5 s após a falha, com `unref`, força saída de erro se ainda houver recursos ativos. Esse fluxo foi projetado para inicialização, sem reiniciar o bot automaticamente.
 
-Em `ready`, o código mantém logs de usuário/servidores e rotação de presença a cada 100 s. Isso é comportamento esperado pelo fonte, sem login remoto comprovado. A limpeza de inicialização remove eventos operacionais, intervalo de presença e timeouts de cooldown; preserva somente um handler fixo de erro para falhas tardias durante a destruição do SDK. Interrompa uma instância local interativa com `Ctrl+C`; serviços hospedados devem ser parados pelo supervisor autorizado.
+Em `ready`, o código registra somente texto fixo de pronto e total agregado validado de servidores, sem tag/nomes/IDs individuais, e mantém rotação de presença a cada 100 s. Isso é comportamento esperado pelo fonte, sem login remoto comprovado. A limpeza de inicialização remove eventos operacionais, intervalo de presença e timeouts de cooldown; preserva somente um handler fixo de erro para falhas tardias durante a destruição do SDK. Interrompa uma instância local interativa com `Ctrl+C`; serviços hospedados devem ser parados pelo supervisor autorizado.
 
 Não há desligamento gracioso geral de SIGINT/SIGTERM. `timers.clearAll()` existe no manager, sem ligação automática ao encerramento do processo. Toda interrupção perde listas `/todo`, timers e cooldowns; essa perda é comportamento conhecido e aceito no [ADR 0003](decisions/0003-estado-operacional-temporario.md). Não se persistem ou restauram esses dados em banco, arquivo, snapshot ou replay. O processo precisa permanecer ativo para atender interações e disparar timers da sessão; não há servidor web para receber tráfego HTTP nem implementação de bot de voz.
 
@@ -144,7 +203,10 @@ Uma confirmação que falha pode ter sido entregue. A inserção/remoção local
 
 | Sintoma | Conferência e limitação |
 | --- | --- |
-| Node/npm sem versão ativa | Conferir versão da `.nvmrc`, localização do runtime e shim NVM. Usar binário portátil explícito fora do `node_modules` alvo ou preparar gerenciador em tarefa apropriada; não foi definido padrão global nesta fase. |
+| Node/npm sem versão ativa | Conferir `.nvmrc`, `Get-Command node,npm,nvm`, versões e `nvm list`. Separar instalação ausente de seleção do shim. Usar distribuição oficial independente verificada fora do alvo de `npm ci`, sem alterar padrão global. |
+| npm bloqueado por NVM4306 | O shim recusou script delegado não confiável. Não execute esse script diretamente nem desative o firewall. Verifique integridade e política do NVM em reparo autorizado, ou prepare distribuição oficial independente verificada como acima. |
+| INVITE_URL inválida / identidade divergente | Na configuração local atual, esvazie `INVITE_URL` em editor seguro para gerar o convite; mantenha TOKEN/CLIENT_ID e confronte a aplicação no Portal. Nunca publique URL/configuração para diagnosticar. Divergência durante `/invite` produz erro privado sem botão. |
+| LOFIRADIO_URL inválida | Use o fallback deixando vazia ou configure HTTPS público conforme a tabela, sem query/fragmento/credenciais. A validação sintática não comprova disponibilidade real. |
 | `Cannot find module 'prettier'` na inicialização/registro | Em commits anteriores à Fase 1, Prettier estava em devDependencies. Conferir manifest/lock atuais e instalação limpa; agora produção inclui Prettier, sem exigir `--include=dev`. Não copiar `node_modules` antigo como correção. |
 | Configuração recusada ou bot não chega a `ready` | Ler somente a mensagem fixa: TOKEN ausente/evidentemente inválido é recusado antes do Client; falha real de login tem prazo de 30 s, cleanup e saída 1. Conferir segredo/aplicação e conectividade em ambiente autorizado, sem imprimir token. |
 | Catálogo recusado ou comandos não carregam | Conferir instalação e contrato dos módulos e executar dry-run/testes offline. Catálogo vazio, duplicatas, falha de require/toJSON ou payload fora da política bloqueiam todo o carregamento antes de login/PUT. Não contornar removendo módulos sem revisar o conjunto global. |
@@ -181,11 +243,13 @@ R17 fica **MITIGATED**: as exposições locais foram removidas, mas captura, ace
 
 Não foi identificado provedor atual ou configuração de Docker, PM2, systemd, CI/CD ou serviço gerenciado. **Não há deploy aprovado ou realizado.** Como proposta técnica: um processo Node persistente com saída HTTPS/WebSocket para Discord/APIs, cwd na raiz, dependências completas, assets presentes, segredo injetado, memória para Buffers QR/texto e logs com retenção/acesso definidos.
 
+Para uma oferta gratuita, confirmar suporte a **processo Node 24 de longa duração**, WebSocket de saída, variáveis secretas, instalação por lockfile, assets e limites de CPU/memória/rede. Uma plataforma apenas estática, uma função curta ou um plano que suspende processos não garante atendimento contínuo nem timers; não foi criado servidor HTTP ou mecanismo artificial de keep-alive. Preferir uma instância para o modelo atual; réplicas têm memórias independentes. Não há requisito de disco durável/banco. Preço, franquia, suspensão e disponibilidade do provedor precisam de verificação na futura escolha; nenhum provedor gratuito foi selecionado ou prometido nesta entrega.
+
 Runtime LTS, instalações limpas normal/produção e contratos offline foram validados em P0/P1.1 e novamente no escopo da P2.4; as correções têm escopos locais em [QUALITY_GATES](QUALITY_GATES.md), sem certificar credenciais, login, permissões ou registro reais. Escopo/privacidade de `/todo` vêm da P2.2; o ADR 0003 aceita volatilidade e elimina persistência/retenção de estado como requisito de hospedagem. Não se exige banco, disco durável, serviço externo ou nova infraestrutura de persistência. Avaliação de encerramento geral, controle de recursos e validação operacional continuam propostas separadas; supervisor/rollback não foram implementados ou autorizados aqui. Rede, roteamento, disponibilidade e compatibilidade efetiva de um provedor gratuito continuam `NOT_CONFIRMED`. Múltiplas réplicas/shards têm estados independentes, sem sincronização; a arquitetura atual é um único cliente/processo com memória local, não uma proposta de armazenamento compartilhado.
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P2.4 está commitada em `b76219d` e a atualização documental P2.5 permanece local sem commit.
+1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. O acesso remoto de clonagem não foi testado nesta fase; P3.1 está na base `3ecdd7c` e P3.2 permanece local sem commit/push. Uma clonagem dessa base ainda não inclui as alterações locais desta entrega.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.

@@ -2,6 +2,32 @@
 
 Use verificações proporcionais à alteração. Uma mudança documental pede revisão de conteúdo, links, diff e segredos; uma mudança em carregamento/contratos pede também sintaxe e serialização de todos os comandos. Uma mudança em API, interação ou estado pede casos de sucesso e falha relevantes. Não use registro global ou login de produção como teste local.
 
+## Resultado P3.2 — identidade, permissões e ambiente — 2026-11-23
+
+Base **develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18**, árvore inicialmente limpa, P3.1 já commitada. Windows x64/PowerShell, America/Sao_Paulo. A indicação anterior de P3.1 local sem commit estava desatualizada; os resultados históricos abaixo não foram reclassificados. Entrega P3.2 local sem commit/push, sem login Discord, registro global, deploy, credenciais ou permissões remotas alterados. Estado exclusivamente em memória e ADRs 0001–0003 preservados.
+
+| Verificação executada | Resultado e limite |
+| --- | --- |
+| Inspeção/baseline | `PASS`: branch/HEAD/status, cérebro, configuração e 23 comandos comparados ao código. `node --test --test-reporter=tap` pelo Node 24.22.2 instalado fora de node_modules: **1189/1189**, antes das edições, zero falhas/skips/cancelamentos/todo. |
+| Diagnóstico Windows | `node --version` **24.22.2**; `nvm list` mostra **24.22.2/20.20.0**; `nvm --version` **2.0.1-hotfix.6**. Get-Command resolve shims em Author Software/nvm/.nodejs; binário real externo executado confirma 24.22.2. `npm --version` pelo shim **BLOCKED NVM4306** (npm-cli.js delegado não confiável); apenas seus metadados 11.19.1 foram lidos. Aviso de escrita de marcador no Registro recusada no sandbox; nenhuma confiança/configuração global alterada. Erro histórico de Node ausente não se reproduziu. |
+| Runtime independente | `PASS`: ZIP oficial v24.22.2 Windows x64 e SHASUMS256.txt baixados de nodejs.org. SHA-256 **CA1BFF5D8EAD13C9F2EA404A176DB46BD430704D5B5113734049FA365E7799E2**, igual à distribuição. Extração em TEMP/CodeBucket-p32-runtime-20261123, fora de qualquer node_modules. CLI real: **Node 24.22.2/npm 11.19.1**. Não se executou a CLI npm bloqueada do NVM. Download inicial sem conectividade no sandbox; repetição escalada autorizada concluiu. |
+| Identidade/OAuth/URLs | `PASS`: **77/77** em `node --test --test-reporter=tap tests/public-links.test.js`. CLIENT_ID válido/ausente/inválido; identidade da interação/configuração/convite coerente ou divergente; zero fallback histórico; host/path/scopes exatos, parâmetros únicos e permissões 117824; rejeição de Administrator/extras/duplicatas/credenciais/portas/fragmentos. Links HTTPS com limites/Unicode/percent-encoding e erros fixos, sem input/cause sensíveis. |
+| Builders e falhas | `PASS` na suíte R12: botões reais Link, URLs do botão/embed/Markdown coerentes, anexos Lofi e links históricos top.gg preservados; reação rejeitada não desfaz resposta; reply/defer/edit rejeitados não repetem entrega. Erro de configuração é privado e não envia URL/reação. Guardas exigem **zero tentativas** DNS/HTTP/TCP/TLS/fetch ou leitura de .env nos testes R12. Nenhuma API/Discord real. |
+| Revisão independente | Encontrou injeção de segundo link pelo delimitador Markdown em URL Lofi e expansão além de 512 após normalização. Corrigidos com percent-encoding de delimitadores e limite no href final; regressões incluídas nos 77 testes. Sem outro bloqueante. Permissões inventariadas em todos os 23 comandos; somente /timer envia mensagem comum posterior. |
+| Focais anteriores | `PASS`: `node --test --test-reporter=tap tests/config.test.js tests/secondary-commands.test.js tests/runtime-entry.test.js tests/startup.test.js`, **127/127**. Fixtures antigas agora fornecem applicationId realista e verificam CLIENT_ID também no runtime. |
+| Suíte completa final | `PASS`: npm CLI **independente verificada**, `test -- --test-reporter=tap`, **1266/1266**, zero falhas/cancelamentos/skips/todo, **77 casos novos**. Regressões HTTP/SSRF, interações, limites, logs, catálogos, timers e todo preservadas. |
+| Sintaxe/formatação | `PASS`: `node --check` via stdin em **63/63** JS (entradas apenas analisadas). `prettier --check` nos **8 JS** novos/alterados aprovado. Documentos revisados sem reformatação indiscriminada dos registros históricos. |
+| Contratos/hash slash | `PASS`: **23/23** payloads JSON comparados individualmente aos builders de HEAD compilados localmente sem execute. SHA-256 **e50cb9e0df937132bf0381b136a80cab6e46bdd0186f69490a825961b9d53f15**, igual ao HEAD e P0; data/execute, nomes, descrições e opções preservados. |
+| Catálogo CLI | `PASS`: `node deploy-commands.js --dry-run` pelo runtime independente: **exit 0/23 comandos**, nenhum registro enviado. Testes CLI anteriores também mantêm guardas de credenciais/rede e não executam modo confirmado real. |
+| Instalações limpas | `PASS`: `npm ci --engine-strict` (development) e `npm ci --omit=dev --engine-strict` (production), **exit 0/85 pacotes cada**, alvos novos em node_modules/.codebucket-p32/ci-development e ci-production, sem .env. Runtime externo, caches/configurações npm isolados, no-audit/no-fund/logs/notificador. Somente registry npm durante instalação. Fontes finais sincronizados; **85/85 versões**, **23 contratos/hash** em ambas, **1566 resoluções** restritas a cada instalação e zero tentativas externas nas validações guardadas. Não se recriou node_modules da raiz. |
+| Dependências/controles | `PASS`: 85 versões da instalação raiz iguais ao lock; manifest/lock/.nvmrc sem diff. Helpers de SSRF/HTTP/interações/conteúdo/catálogos/todo/timers e ADRs preservados; sem dependência, persistência ou comando novo. Um verificador inicial comparou CRLF do checkout com LF do Git como bytes; foi corrigido para normalizar finais de linha, sem mudar código/lock, e passou. |
+| Configuração local | Leitura **offline e sanitizada** com dotenv/readConfig: .env existente carregado sem exibir valores; **INVITE_URL recusada**. CLIENT_ID/LOFIRADIO_URL individualmente válidos estruturalmente; readConfig com INVITE_URL vazia em cópia do ambiente passa. Arquivo/credenciais preservados. Corrigir apenas o override público conforme runbook antes de login autorizado; isso não comprova TOKEN/CLIENT_ID remotamente. |
+| Documentação/diff/segredos | Diff, codificação UTF-8 e whitespace nos **18 arquivos**, **369 links locais/33 âncoras** conferidos; .env ignorado/não rastreado e node_modules/artefatos ignorados. Comparação local contra TOKEN sem imprimir valor e revisão de padrões nos **18 arquivos e 4 logs** de execução. Nenhum valor sensível publicado. Inventário de links e matriz de permissões em COMMANDS, sequência e checklist em OPERATIONS. |
+
+Artefatos auxiliares ignorados em `node_modules/.codebucket-p32/`: `final-tests.log`, `r12-tests.log`, `validation.json`, validadores e resultados/instalações ci. Baseline TAP foi observada no terminal, sem arquivo persistido. Runtime verificado em `C:\Users\Emanuel\AppData\Local\Temp\CodeBucket-p32-runtime-20261123\node-v24.22.2-win-x64`; área temporária pode desaparecer. PATH foi ajustado somente no subprocesso PowerShell, sem mudar NVM/segurança/Registro ou PATH persistente. Reprodução atual em [OPERATIONS](OPERATIONS.md); exemplos portáteis P0 abaixo são históricos e a área antiga está ausente nesta máquina.
+
+**P3.2 DONE no escopo offline; R12 MITIGATED.** Associação real TOKEN/CLIENT_ID, instalação/scopes efetivos, sobrescritas, DM/threads, disponibilidade/propriedade/destinos finais dos links, conexão Discord e hospedagem gratuita continuam **NOT_CONFIRMED**. Validador de link não consulta DNS/HTTP nem substitui SSRF. npm audit, histórico integral de segredos/logs e recuperação operacional integral não executados. Não há nova garantia de sanitização fora dos pontos de log da aplicação já auditados. A próxima ação segura é corrigir INVITE_URL pública no ambiente local e repetir a validação estrutural; login, registro e deploy exigem o escopo explícito correspondente.
+
 ## Resultado P3.1 — privacidade, logs e diagnósticos — 2026-11-14
 
 Base **develop/7499426f9ab9490407c82b69b9f05d993c46792f** (P2.5 já commitada), árvore limpa no início em **2026-11-13**; retomada/fechamento em **2026-11-14**, America/Sao_Paulo. Windows x64/PowerShell, Node **24.22.2**, npm **11.19.1**, runtime portátil P0, instalação existente. Alterações locais sem commit/push. Sem login real, registro remoto, reinício, deploy, credencial alterada ou consulta a tarefas/logs históricos reais.
@@ -269,23 +295,26 @@ Os gates de documentação foram executados ao fechar esta entrega. O resultado 
 
 ## Reproduzir verificações offline
 
-Com Node da `.nvmrc` preparado, os exemplos abaixo usam `node` pelo PATH. No ambiente desta fase foi usado o binário portátil explícito, conforme [operações](OPERATIONS.md); as flags dos exemplos de runtime portátil e carregamento contornam resolução de ancestrais e não são requisito da arquitetura. Para provar isolamento, repita os checks na instalação limpa, nunca substitua suas dependências pelas antigas.
+Com Node da `.nvmrc` preparado, os exemplos abaixo usam `node` pelo PATH. Em P3.2, use a sessão do runtime independente verificado conforme [operações](OPERATIONS.md); a área portátil P0 antiga está ausente. As flags de symlinks usadas historicamente contornavam resolução de ancestrais e não são requisito da arquitetura. Para provar isolamento, repita os checks na instalação limpa, nunca substitua suas dependências pelas antigas.
 
 Suíte permanente, sem Internet, DNS ou sockets reais:
 
 ```powershell
 npm test
-# Alternativa usada para o runtime portátil no ambiente atual:
-$p1Runtime = (Resolve-Path 'node_modules/.codebucket-p0/runtime/node-v24.22.2-win-x64').Path
-$env:PATH = "$p1Runtime;$env:PATH"
-$env:NODE_OPTIONS = '--preserve-symlinks --preserve-symlinks-main'
-& "$p1Runtime/node.exe" "$p1Runtime/node_modules/npm/bin/npm-cli.js" test -- --test-reporter=dot
+# Alternativa P3.2: distribuicao independente verificada, fora de node_modules.
+$p32Runtime = Join-Path $env:TEMP 'CodeBucket-p32-runtime-20261123/node-v24.22.2-win-x64'
+if (-not (Test-Path -LiteralPath "$p32Runtime/node.exe")) {
+    throw 'Prepare o runtime oficial verificado conforme OPERATIONS antes de continuar.'
+}
+$env:PATH = "$p32Runtime;$env:PATH"
+& "$p32Runtime/node.exe" "$p32Runtime/node_modules/npm/bin/npm-cli.js" test -- --test-reporter=tap
 if ($LASTEXITCODE -ne 0) { throw 'Falha na suite offline' }
 ```
 
 Análise sintática com entrada por stdin, sem login nem registro:
 
 ```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $sourceFiles = @(Get-Item -LiteralPath index.js,deploy-commands.js) + @(Get-ChildItem -LiteralPath commands,lib,tests -Filter '*.js')
 foreach ($sourceFile in $sourceFiles) {
     Get-Content -LiteralPath $sourceFile.FullName -Encoding UTF8 -Raw | node --check
