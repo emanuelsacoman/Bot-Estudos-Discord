@@ -2,6 +2,8 @@
 
 Atualização **P3.2 — R12, 2026-11-23**, base **develop/3ecdd7cca90344f1bb0d5eb4cf072c4ce6516d18**, inicialmente limpa; P3.1 já commitada. Identidade e links públicos são validados localmente em config.js; o convite usa a aplicação da interação e confere CLIENT_ID/INVITE_URL quando configurados. R12 fica **MITIGATED** por identidade/permissões/links remotos ainda não confirmados. As proteções P0–P3.1, os 23 contratos e ADRs 0001–0003 são preservados. Resultados históricos e atuais em [qualidade](QUALITY_GATES.md), [estado](PROJECT_STATE.md), [comandos](COMMANDS.md) e [operação](OPERATIONS.md).
 
+Fechamento P3.3 e preparação P3.4, base develop/6478dab: o responsável confirmou configuração/login, 134 servidores observados e os 23 comandos manualmente funcionais. Essa evidência operacional agregada não altera a arquitetura nem comprova todos os contextos/permissões/restart/hospedagem/retenção; nenhum log ou cenário individual foi coletado. Gates atuais e comparação de main estão em [QUALITY_GATES](QUALITY_GATES.md); R12 segue MITIGATED. Código e ADRs preservados nesta entrega documental.
+
 ## Componentes e responsabilidades
 
 É um bot JavaScript CommonJS em um único processo Node.js, orientado a eventos do discord.js 14. Cada comando concentra definição pública e execução, com módulos locais para configuração, catálogos de comandos/documentação, inicialização/registro, respostas, HTTP e timers. Não há camadas de domínio ou repositórios separadas, banco de dados, servidor HTTP próprio, fila, CI ou infraestrutura de hospedagem versionada. A suíte `node:test` usa relógio, Discord e transporte simulados; evidências e limites estão em qualidade.

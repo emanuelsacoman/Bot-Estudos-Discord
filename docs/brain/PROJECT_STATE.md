@@ -1,18 +1,21 @@
 # Estado atual do projeto
 
-Atualizado na **P3.3 — preparação operacional, 2026-11-23**, America/Sao_Paulo. Base **develop/9d1b8639bfc629a69a6f464bf05cf8ec1fad7401**, árvore inicialmente limpa. P3.2 commitada e enviada: comparação GitHub somente leitura contra develop remoto retornou identical/0 ahead/0 behind. Nenhuma escrita remota ou atualização automática do checkout. P3.3 IN_PROGRESS, com gates offline executados e conexão bloqueada pela configuração pública pendente; trabalho local sem commit/push. Registros anteriores abaixo são históricos; evidências atuais em [QUALITY_GATES](QUALITY_GATES.md).
+Atualizado no **fechamento P3.3 e preparação P3.4 — 2026-11-23**, America/Sao_Paulo. Base **develop/6478dabf9ed565136d079e06bacfae65f8f6bc2a**, inicialmente limpa, P3.3 preparatória commitada/enviada. Fechamento local sem commit/push/merge. Comparações GitHub somente leitura confirmam as refs locais de develop/main; demais registros de fases abaixo são históricos. Evidências atuais e limites em [QUALITY_GATES](QUALITY_GATES.md).
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
 
-## Pré-conexão P3.3 — estado comprovado
+## Fechamento P3.3 e prontidão P3.4
 
-| Área | Resultado atual |
+| Fonte / área | Constatação e limite |
 | --- | --- |
-| Runtime/offline | Node 24.22.2/npm 11.19.1 independentes disponíveis; PowerShell 5.1.19041.6456. Suíte 1266/1266, sintaxe 63/63, contratos 23/23/hash P0 preservados, dry-run exit 0/23 e 85 versões iguais ao lock. Não se repetiu instalação limpa porque manifest/lock/dependências não mudaram; instalações P3.2 são históricas. |
-| Configuração | TOKEN/CLIENT_ID/LOFIRADIO_URL estruturalmente válidos; INVITE_URL inválida impede configuração completa. .env preservado e sem exposição de valores. Usuário adiou ajuste manual. Nenhum override aplicado ao processo do bot. |
-| Discord/permissões | Login não autorizado/não executado; 0/23 comandos testados remotamente, nenhuma permissão validada. R12 MITIGATED; associação TOKEN/CLIENT_ID, comandos remotos, links, DM/threads e hospedagem NOT_CONFIRMED. Roteiro individual em OPERATIONS. |
-| Instância única | Não iniciada nesta tarefa. WMI de command lines recusado por acesso negado; cinco processos Node visíveis não foram atribuídos nem encerrados. Conferir concorrência antes da autorização/execução futura. |
-| Próxima ação | Responsável deixa INVITE_URL= vazia e avisa; repetir validação efetiva. Somente após configuração aprovada, solicitar consentimento explícito para uma instância local. Sem autorização para registro global/deploy/permissões/credenciais. |
+| Responsável — relato operacional | **P3.3 DONE no escopo funcional relatado.** Configuração validada, login bem-sucedido, contagem pontual de **134 servidores**, todos os **23 comandos** manualmente funcionais e novo registro global desnecessário. Relato recebido em 2026-11-23, sem data/hora original ou SHA da instância fornecidos. |
+| Limites da evidência manual | Sem logs, inputs ou resultados individuais coletados. Não atribuir o êxito aos cenários exatos do roteiro anterior nem inferir DM/threads, isolamento adversarial, sobrescritas/permissões negativas, uptime, reinício ou retenção de logs. Os 134 são um total observado, não inventário ou medida de estabilidade. |
+| Verificações automatizadas atuais | **1266/1266**, sintaxe **63/63**, contratos **23/23** e hash iguais ao HEAD/main/P0; dry-run exit 0/23, dependências 85/85 e três assets preservados. Node 24.22.2/npm 11.19.1 independentes. Sem login real nesta tarefa. |
+| Comparação de branches | main/cea09b9 ancestral de develop/6478dab, **0/14 commits exclusivos**, **81 arquivos** (54 adicionados/27 modificados), 16008 inserções/994 remoções; confirmado no GitHub sem fetch/escrita. Fast-forward permitido pelo grafo; regras de proteção/aprovações do repositório não foram verificadas. |
+| Prontidão técnica | Nenhum bloqueante concreto encontrado pela revisão independente e gates. **Apta para integração controlada**, após revisão/incorporação deste fechamento documental, rechecagem do snapshot/regras e autorização explícita. Nenhum merge/commit/push autorizado ou realizado. |
+| Escopo acumulado / regressões | P0–P3.3 alteram interações/HTTP/SSRF, estado/visibilidade, catálogo/registro/arranque, logs e links. Os 23 payloads permanecem iguais. Prettier 3.5.3 passa para produção; Node 24/.nvmrc e todos os helpers/assets precisam acompanhar a versão integrada. 85 pacotes travados sem mudança de versão/resolved/integrity. |
+| Residuais operacionais | R12 MITIGATED; hospedagem, estabilidade prolongada, retomada/encerramento/reinício, instância única e retenção/histórico de logs NOT_CONFIRMED. Estado só em memória e perda após reinício são deliberados (ADR 0003). Não foi inspecionado, iniciado ou encerrado processo do bot nesta tarefa. |
+| Próxima ação | Seguir [critérios P3.4](ROADMAP.md#p34--revisão-de-integração-develop-para-main); manter ações Git e operação remota sob autorização específica. |
 
 ## Identidade e escopo comprovados
 
@@ -67,8 +70,8 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 | `DONE` | P3.2: identidade Discord e URLs configuráveis validadas em config.js; convite vinculado à interação/CLIENT_ID, scopes bot applications.commands e permissions=117824, sem fallback histórico. top.gg histórico preservado como página externa; Lofi HTTPS validado e delimitadores Markdown codificados. Campos link sem efeito da presença removidos, sem mudar intents. Matriz dos 23 comandos e runbook atualizados. |
 | `DONE` | P3.2: baseline 1189/1189; final 1266/1266; focais R12 77/77; sintaxe 63/63; 23 contratos/hash P0/HEAD preservados; dry-run exit 0/23 comandos. Duas instalações isoladas normal/produção exit 0/85 pacotes cada, resolução restrita e contratos/hash em ambas. Evidências em QUALITY_GATES. |
 | `MITIGATED` | R12: testes offline cobrem identidade, OAuth, links, builders e erros sanitizados; identidade autenticada, permissões efetivas, disponibilidade/destino final de links e operação remota continuam NOT_CONFIRMED. |
-| `KNOWN_RISK` | Validação estrutural do .env local em P3.2, sem exibir valores, recusou INVITE_URL. Arquivo preservado: deixar INVITE_URL vazia ou corrigir conforme contrato antes de login autorizado. CLIENT_ID presente; associação TOKEN/CLIENT_ID não validada remotamente. |
-| `NOT_CONFIRMED` | Login real, validade do token, correspondência TOKEN/CLIENT_ID, comandos registrados remotamente, permissões, disponibilidade de APIs/links, hospedagem, uptime e recuperação prática. |
+| `DONE` | Fechamento P3.3: responsável informou configuração local validada e login real bem-sucedido, superando a pendência de INVITE_URL do estágio anterior. Não foi coletado o valor aplicado nem se releu/alterou .env nesta tarefa; não se inventa configuração ou credencial. |
+| `NOT_CONFIRMED` | Detalhes de associação/identidade e permissões efetivas por canal/DM/thread, catálogo remoto inspecionado, disponibilidade contínua de APIs/links, hospedagem, uptime e recuperação/reinicialização prática. Login e funcionamento dos 23 comandos foram relatados pelo responsável, sem evidência detalhada coletada pelo agente. |
 
 ## Dependências efetivas
 
