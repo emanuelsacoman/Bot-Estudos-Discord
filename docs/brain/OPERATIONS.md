@@ -1,6 +1,83 @@
 # Operação e recuperação
 
+## Discloud Free — P3.5
+
+Atualizado em **2026-11-28**, America/Sao_Paulo, base develop/4655fe3 inicialmente limpa. **P3.4 DONE:** merge PR #1 já presente, refs locais main/develop/origin iguais. Esta tarefa só prepara arquivos e executa verificações offline. **Prontidão: BLOCKED para deploy**, porque Node 24.x efetivo na Discloud não pôde ser confirmado. Nada abaixo autoriza upload, iniciar/encerrar bot ou transferir segredos. Os registros P3.3/P3.4 de 2026-11-23 mais abaixo são históricos.
+
+### Configuração e runtime
+
+[discloud.config](../../discloud.config) usa somente NAME=CodeBucket, TYPE=bot, MAIN=index.js, RAM=100 e VERSION=latest. Os campos seguem a [referência oficial](https://docs.discloud.com/configurations/discloud.config). CommonJS não precisa de compilação; não há necessidade demonstrada de BUILD/START. AUTORESTART exige Platinum, portanto não foi configurado. O [Free](https://discloud.com/plans) informa 100 MB e um bot, sem sites; isso não garante uptime.
+
+**VERSION=24 não está na [lista oficial de versões](https://docs.discloud.com/configurations/discloud.config/versions).** latest é documentado como LTS mais recente, sem dizer qual major a imagem executa. VERSION=latest é apenas um candidato sintaticamente documentado. Não se assume 24, não se usa current como atalho e não se altera engines.node=24.x. Localmente foi executado Node **24.22.2**, referência da [.nvmrc](../../.nvmrc), com npm **11.19.1** independente. Essa evidência não comprova o runtime Linux da Discloud.
+
+**Desbloqueio obrigatório:** obter da Discloud confirmação oficial de um seletor Node 24.x, com versão/imagem e data. Depois, numa verificação de ambiente expressamente autorizada e sem autenticar outra instância do bot, registrar a saída efetiva de node --version, npm --version e a instalação utilizada. Se não houver acesso a um console/diagnóstico sem login, solicitar evidência do runtime ao suporte; não fazer upload do CodeBucket para descobrir por tentativa. Um latest móvel exige revalidação em cada atualização. Se o fornecedor confirmar um seletor fixo novo, revisar config/validador com essa evidência e repetir gates antes do upload. Não há deploy autorizado nesta preparação.
+
+### Preparar e validar o pacote seguro
+
+1. Na raiz, conferir git status, revisão pretendida e CURRENT. Preparar Node 24.22.2/npm 11.19.1 conforme o procedimento Windows abaixo. Em checkout limpo, instalar com npm ci --engine-strict; produção pode usar --omit=dev. Não substituir o node_modules local em uso. A P3.5 não mudou manifests/lock; instalações limpas anteriores são evidência histórica, identificada em QUALITY_GATES.
+2. Executar os gates offline e o empacotador. Os comandos abaixo não iniciam o bot nem carregam .env. Se o npm do shim recusar execução, usar o runtime independente documentado, sem contornar a proteção do shim.
+
+   ```powershell
+   npm test
+   node deploy-commands.js --dry-run
+   node scripts/discloud-package.js --check
+   New-Item -ItemType Directory -Path dist -Force | Out-Null
+   node scripts/discloud-package.js --output dist/CodeBucket-preparation.zip
+   node scripts/discloud-memory.js
+   ```
+
+3. --check lista os arquivos efetivamente selecionados, contagem e hash; --output cria ZIP determinístico e recusa sobrescrever um arquivo existente. Usar outro nome numa nova preparação ou gerenciar o artefato anterior manualmente. O ZIP é um **artefato seguro de preparação, sem credenciais e sem autenticação pronta**. Não fazer upload dele como se o bot pudesse autenticar.
+4. A allowlist contém index.js, commands/*.js, lib/*.js, as três imagens, package.json, package-lock.json, discloud.config e .discloudignore, diretamente na raiz do ZIP. São verificados imports locais literais, dependências declaradas, assets e arquivos inesperados nos diretórios de runtime. O carregamento dinâmico do catálogo de commands é tratado explicitamente; novas formas de import/novos assets exigem revisão do empacotador. Ele não executa o runtime para descobrir dependências.
+5. [.discloudignore](../../.discloudignore) segue [nomes exatos](https://docs.discloud.com/configurations/.discloudignore), sem glob ou barras finais. Exclui Git, node_modules, IDEs, testes/docs/scripts, dist, caches/logs conhecidos e .env. A allowlist também omite arquivos arbitrários não listados; ignore sozinho não protege de todo nome de log/segredo futuro. Symlinks e padrões convencionais de credenciais são recusados; esse scan é heurístico, sem ler/comparar o segredo real. Rever o conteúdo versionado antes de distribuir.
+6. Preservar package-lock.json deliberadamente: o [exemplo JavaScript oficial](https://docs.discloud.com/development-environment/supported-languages/javascript) sugere ignorá-lo, mas o projeto precisa do grafo reproduzível. Não há prova de que o instalador remoto use npm ci ou respeite o lock integralmente. Conferir log de instalação e versões efetivas posteriormente; não enviar node_modules Windows para Linux. Prettier é dependência de produção.
+
+### Credenciais privadas e primeiro upload manual
+
+O [método documentado](https://docs.discloud.com/faq/general-questions/.env-file) é .env na raiz ao lado de discloud.config. Não foi confirmado um painel separado de secrets. TOKEN é obrigatório para iniciar; CLIENT_ID é opcional no runtime e obrigatório somente para registro global, que não será repetido. INVITE_URL é opcional (vazia deriva a aplicação da interação); LOFIRADIO_URL é opcional com fallback público. Contratos completos na seção de configuração abaixo. Nenhum valor de .env foi lido, alterado ou transferido nesta tarefa.
+
+Somente depois de desbloquear o runtime e autorizar a operação, o responsável deve extrair o ZIP seguro para uma pasta privada temporária **fora do checkout e de pastas sincronizadas/compartilhadas**. Criar ali o .env usando armazenamento seguro/editor local, preservando o original; não escrever valores em terminal, chat ou logs. Compactar manualmente o conteúdo dessa pasta em **outro ZIP privado** com .env na raiz, sem pasta externa. Esse ZIP contém segredo em texto simples: restringir acesso local, não versionar/anexar/publicar e manter apenas pelo tempo necessário. Conferir nomes/estrutura sem exibir o conteúdo. O script desta tarefa nunca cria esse ZIP privado.
+
+O .discloudignore permanece protegendo uploads automatizados: ferramentas que o aplicam excluirão .env. Para o procedimento acima, usar envio do **ZIP privado já montado**, pelo painel autenticado oficial, e confirmar que .env permaneceu nele; não executar CLI/extensão que recompacte o checkout por conveniência. Se a interface filtrar o arquivo ou não oferecer transferência privada, interromper e esclarecer o método com o fornecedor. Não remover a proteção do checkout. Após a operação autorizada, o responsável deve remover as cópias privadas temporárias/ZIP conforme sua política de segredos, sem presumir eliminação segura em SSD/backups.
+
+**Transição de instância obrigatória, antes do upload:** identificar a instância local/serviço/hospedagem atualmente ativa e obter autorização específica para encerrá-la. Usar o terminal/serviço próprio, nunca encerrar Node genérico. Confirmar sua saída; ausência de processo atribuível não pode ser inferida de uma lista genérica. Registrar a perda aceita de todo/timers/cooldowns/pausas em memória. Só então enviar o ZIP, pois o upload pode iniciar a aplicação. Não manter duas instâncias conectadas. Nenhum processo do bot foi inspecionado ou encerrado nesta tarefa.
+
+No [painel autenticado](https://docs.discloud.com/deployment-methods/dashboard): Aplicações → + Upload → Upload ZIP. A [compactação oficial](https://docs.discloud.com/faq/general-questions/how-to-compress) exige ZIP e arquivos na raiz. Selecionar a conta Free e a aplicação correta; conferir 100 MB e ausência de recursos pagos antes de enviar. Registro global dos 23 comandos existentes não depende da mudança de máquina; contratos iguais não justificam executá-lo novamente.
+
+### Verificação após publicação autorizada
+
+1. No painel → Aplicações → aplicação → [Logs](https://docs.discloud.com/faq/general-questions/how-to-access-the-application-logs), conferir instalação e runtime, ausência de erro de engine/módulo/asset/configuração e a mensagem fixa **Pronto! Login realizado.**, seguida de contagem agregada de servidores. Não compartilhar dumps, token, URLs com query ou dados individuais. Definir quem acessa logs e verificar retenção/histórico; o seletor de período não prova retenção garantida.
+2. Conferir status do processo na plataforma e presença do bot no Discord. ready isolado não atesta uptime ou entrega. Registrar data/fuso, revisão do código, versão Node/npm, hash do pacote e resultado. Não alterar permissões para produzir um resultado positivo sem autorização própria.
+3. Em canal de teste autorizado, executar /ping, /help e /docs; conferir resposta, conteúdo/legibilidade e seleção do menu. Registrar PASS/FAIL individualmente, sem dados privados. Contratos globais/hash permanecem os 23 existentes; não registrar novamente como tentativa de corrigir timeout.
+4. Observar RSS/memória reportada pelo container, repouso e pico durante carga representativa dos comandos, incluindo QR/Prettier e HTTP concorrente. Procurar encerramento por limite/OOM e reinícios/saídas anormais; a ausência de stack JS não exclui OOM. Confirmar a métrica/unidade do painel e margem abaixo de 100 MB. Não inferir estabilidade a partir de uma única amostra ou dos 134 servidores históricos.
+
+### Memória e recuperação
+
+[discloud-memory.js](../../scripts/discloud-memory.js) mede process.memoryUsage() em processo separado offline: baseline, catálogo, Client Guilds sem login/caches vazios, cinco parsers do Prettier e QR sintético grande. Bloqueia leitura de .env e rede; não representa tráfego real nem mede cgroup/Linux. Resultados efetivos e ambiente em QUALITY_GATES. RSS inclui heap e alocações nativas; heapUsed/external/arrayBuffers não devem ser somados como métricas independentes. --max-old-space-size limita apenas parte do heap, não o RSS/container.
+
+Na configuração atual o Client usa somente Guilds, sem override de caches: discord.js mantém guilds/canais/roles/membros recebidos conforme eventos/defaults; sem GuildMembers intent não há busca integral automática de todos os membros, mas os caches não estão vazios após ready real. Não se desabilitou cache. Todo limita texto a 8 MiB/1024 usuários, com overhead de objetos adicional; timers e cooldowns não têm teto agregado. QR/imagens/anexos usam Buffers, Prettier aquece parsers e consultas HTTP de até 1 MiB podem coexistir: os limites são por operação, sem teto global de concorrência. Se 100 MB se mostrar insuficiente, medir antes/depois de mudanças pequenas autorizadas, como carregamento tardio de parsers, concorrência limitada ou cache específico com testes. Nenhuma otimização especulativa foi aplicada.
+
+| Evento | Comportamento implementado / verificação pendente |
+| --- | --- |
+| Início normal | dotenv → config → catálogo → Client Guilds → handlers → login; ready registra mensagem fixa. Não há build/registro global automático. |
+| Credencial/configuração inválida | Formato inválido falha antes de criar cliente; rejeição de autenticação tem diagnóstico fixo, cleanup e exitCode=1. Não imprimir token ou erro bruto. |
+| Discord indisponível no arranque / timeout | Login limitado a 30 s; cleanup até 2 s e fallback de saída 1 após 5 s da falha. Prazos dependem do event loop. Corrigir causa e autorizar retomada manual; não criar loop de relogin. |
+| Desconexão após login | SDK trata reconexão conforme seu transporte; eventos de erro recebem diagnóstico sanitizado. Retomada efetiva e duração não foram testadas na Discloud. Não há supervisor próprio. |
+| API externa falha | Prazo 5 s/corpo 1 MiB, erros sanitizados, pausas de quota/backoff voláteis sem retry/fila. Falha de API não exige reiniciar o bot. |
+| Sinal/kill/OOM/container reinicia | Não há handler de SIGTERM/SIGINT/shutdown geral de sucesso. Processo termina; não se garante aviso final de timers nem limpeza protocolar. Reexecução começa vazia pelo ADR 0003. Reinício automático Free não foi configurado nem presumido. |
+
+O [diagnóstico oficial](https://docs.discloud.com/faq/troubleshooting-solutions/diagnosing-offline-applications) informa encerramento por excesso de RAM e exclusão de app Free offline por 30 dias. Continuidade sem o computador local ainda depende do runtime, memória, disponibilidade da plataforma e acompanhamento manual; não se promete recuperação automática no Free.
+
+### Atualizar, interromper e fazer rollback
+
+Em operação futura autorizada, registrar app ID/revisão/hash e guardar o último ZIP **sem segredos** validado e acesso privado às credenciais. Repetir gates afetados e confirmar Node 24.x. Conferir instância única. Usar o fluxo oficial [Commit Discloud](https://docs.discloud.com/faq/general-questions/how-to-commit) para atualizar a aplicação existente, sem confundir com git commit. O overlay cria/substitui enviados e **mantém ausentes**: .env remoto pode ser preservado sem reenviar segredo, mas arquivos obsoletos também permanecem. Comparar inventário antigo/novo antes de atualizar; se houve remoções/renomes, interromper e planejar explicitamente a limpeza/recriação autorizada. Não presumir rollback completo por enviar ZIP antigo. Revalidar instalação quando manifests/lock mudarem e repetir ready/smoke/memória.
+
+Para status/logs/stop/start, usar o painel da aplicação identificada; a [CLI oficial](https://docs.discloud.com/deployment-methods/cli.md) também documenta discloud app status/logs/stop/start/restart com o ID. CLI autenticada e comandos de controle são ações operacionais, não gates offline. Não executar upload/commit CLI na raiz com .env, pois pode montar outro ZIP. Antes de reiniciar, registrar a perda volátil e confirmar que não há processo local ativo.
+
+Se falhar: consultar logs sanitizados/status/memória, identificar configuração/runtime/dependência/rede e parar a aplicação correta mediante autorização. Não repetir autenticação/registros ou alterar credenciais por tentativa. Repor o código do último pacote compatível, respeitando resíduos do overlay e conservando o .env remoto; recriar/remover arquivos exige plano e autorização próprios. Se retornar ao computador local, **primeiro confirmar Discloud parada**, depois autorizar iniciar a única instância local. Restabelecer credenciais pelo responsável se necessário, sem publicar valores. Listas/timers não são restaurados; bancos/filas/arquivos de estado continuam fora do escopo. Documentar resultado e atualizar CURRENT; nenhum rollback/stop/start foi exercitado nesta preparação.
+
 ## Fechamento P3.3 e preparação P3.4
+
+**Registro histórico de 2026-11-23, anterior ao merge 4655fe3.** A integração está concluída; usar P3.5 acima para o estado atual da hospedagem.
 
 Atualizado em **2026-11-23**, America/Sao_Paulo, base **develop/6478dabf9ed565136d079e06bacfae65f8f6bc2a**, inicialmente limpa. A preparação P3.3 está commitada e enviada nessa revisão; comparação somente leitura com `develop` remoto confirmou **ahead 0 / behind 0**. Este fechamento documental é posterior à revisão e permanece local, sem commit, push ou merge executado pelo assistente nesta tarefa.
 
@@ -299,11 +376,13 @@ A aplicação escreve somente diagnósticos curtos por console através de [safe
 - Falha de método/getter/logger e rejeição assíncrona são descartadas sem await, retry ou fallback recursivo. Um diagnóstico pode se perder; a falha não deve mudar código de saída, impedir cleanup/presença/resposta ou repetir operação já aplicada.
 - Para compartilhar diagnóstico, usar somente o trecho mínimo sanitizado necessário e conferir a ausência de dados sensíveis antes do envio. Esta tarefa não autorizou compartilhamento de logs com terceiros.
 
-**Retenção externa:** stdout/stderr podem ser capturados pela plataforma de hospedagem; nenhum provedor/configuração atual foi identificado. O código não controla prazo de retenção, réplicas/backups, acesso ou eliminação desses registros. Em tarefa operacional autorizada, o responsável deve identificar o destino, verificar quem pode consultar/exportar, definir e conferir retenção/eliminação proporcionais à manutenção e revisar eventuais logs históricos que já contenham dados individuais. Não se declara prazo, garantia de exclusão ou política de um provedor desconhecido; não se consultou/apagou histórico nem se alterou hospedagem nesta entrega.
+**Retenção externa:** stdout/stderr podem ser capturados pela plataforma; Discloud Free é candidata na P3.5, sem implantação ou configuração de retenção validada. O código não controla prazo de retenção, réplicas/backups, acesso ou eliminação desses registros. Em tarefa operacional autorizada, o responsável deve identificar o destino, verificar quem pode consultar/exportar, definir e conferir retenção/eliminação proporcionais à manutenção e revisar eventuais logs históricos que já contenham dados individuais. Não se declara prazo, garantia de exclusão ou política de um provedor desconhecido; não se consultou/apagou histórico nem se alterou hospedagem nesta entrega.
 
 R17 fica **MITIGATED**: as exposições locais foram removidas, mas captura, acesso e retenção/histórico externos continuam NOT_CONFIRMED. O funcionamento real relatado pelo responsável não incluiu coleta ou auditoria desses logs. Os fluxos testados e limitações estão em [QUALITY_GATES](QUALITY_GATES.md). O escopo não adiciona handlers globais de exceção nem garante sanitização de logs do Node, dependências ou plataforma fora dos pontos da aplicação auditados.
 
 ## Preparação para futura hospedagem
+
+**Histórico P3.2/P3.3:** requisitos gerais anteriores à escolha da Discloud para preparação P3.5. Estado atual e bloqueios no runbook Discloud acima.
 
 Não foi identificado provedor atual ou configuração de Docker, PM2, systemd, CI/CD ou serviço gerenciado. **Não há deploy aprovado ou realizado.** Como proposta técnica: um processo Node persistente com saída HTTPS/WebSocket para Discord/APIs, cwd na raiz, dependências completas, assets presentes, segredo injetado, memória para Buffers QR/texto e logs com retenção/acesso definidos.
 
@@ -313,7 +392,7 @@ Runtime LTS, instalações limpas normal/produção e contratos offline foram va
 
 ## Recuperar após perda de máquina ou hospedagem
 
-1. Obter uma cópia íntegra do repositório e selecionar branch/commit pretendidos. O cérebro está na `develop`; exemplo em máquina nova: `git clone --branch develop https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`; entrar na pasta e conferir `git status`/`git log -1`. Neste fechamento, a comparação GitHub confirmou a preparação P3.3 commitada e enviada em `6478dab`, idêntica à `develop` remota (ahead 0 / behind 0). Uma clonagem dessa revisão inclui a preparação P3.3, mas ainda não este fechamento local posterior; a clonagem e o merge para main não foram executados nesta tarefa.
+1. Obter uma cópia íntegra do repositório e selecionar explicitamente a revisão pretendida. No snapshot local P3.5, main/develop estão integradas em 4655fe3; exemplo em máquina nova: `git clone --branch main https://github.com/emanuelsacoman/Bot-Estudos-Discord.git`, entrar na pasta e conferir `git status`/`git log -1`. Confirmar a revisão remota no momento da recuperação, sem presumir que permaneça igual ao snapshot local. Os arquivos P3.5 desta tarefa ainda não foram commitados/enviados: recuperar também essa preparação local se necessária. Clonagem, fetch e recuperação real não foram executados nesta tarefa.
 2. Ler [AGENTS](../../AGENTS.md), [CURRENT](CURRENT.md), [estado](PROJECT_STATE.md) e este procedimento. Restaurar alterações/documentos que tenham sido salvos em backup mas ainda não estejam no Git.
 3. Preparar Node da `.nvmrc` (24.22.2) e npm correspondente (11.19.1); instalar com o lock via `npm ci --engine-strict`, ou `npm ci --omit=dev --engine-strict` em produção, em checkout novo com os manifests desta fase. Conservar `commands/`, `lib/`, testes e os três assets versionados.
 4. Recuperar `TOKEN` de armazenamento seguro autorizado e o Application ID da aplicação existente. O token não está no Git e não pode ser reconstruído pelo `.env.example`. Se não houver acesso ao segredo/conta, a recuperação depende do responsável; rotação de credenciais é ação separada e não foi autorizada nesta auditoria.

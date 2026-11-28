@@ -2,6 +2,42 @@
 
 Use verificações proporcionais à alteração. Uma mudança documental pede revisão de conteúdo, links, diff e segredos; uma mudança em carregamento/contratos pede também sintaxe e serialização de todos os comandos. Uma mudança em API, interação ou estado pede casos de sucesso e falha relevantes. Não use registro global ou login de produção como teste local.
 
+## P3.5 — Discloud Free, preparação offline — 2026-11-28
+
+Base **develop/4655fe3f0f7e7c3b06b164957a17ad74577e2e32**, árvore inicialmente limpa. Windows x64/PowerShell **5.1.19041.6456**, Node oficial independente **24.22.2/npm 11.19.1** do procedimento P3.2, fora de node_modules. Data/fuso America/Sao_Paulo. A integração P3.4 já estava feita: merge PR #1 no grafo, main/develop e refs origin locais iguais; não se consultou o estado remoto atual nem se alteraram refs. Sem deploy, login, stop/start de bot, transferência de credenciais, registro global, commit/push/merge ou alteração da main. Entradas não executadas em modo operacional; dry-run de registro é exclusivamente offline.
+
+| Verificação executada | Resultado e limites |
+| --- | --- |
+| Auditoria | PASS: AGENTS, cérebro solicitado, manifests/lock, .nvmrc/ignores/exemplo, startup, 23 módulos, 14 lib e três assets inspecionados. Não existiam arquivos Discloud no snapshot inicial. .env real não lido nem revalidado. |
+| Fontes oficiais Discloud | Consultadas páginas de config/versões/ignore/.env/JavaScript, planos, painel, ZIP, commit, logs, CLI e diagnóstico, referenciadas no runbook. Free 100 MB/1 bot; AUTORESTART Platinum. **Node remoto NOT_CONFIRMED: deploy BLOCKED**, pois VERSION=24 não está listado e latest não identifica major efetivo. Nenhum teste remoto convertido em PASS. |
+| Runtime local | PASS: executados node --version e npm CLI --version independentes, **v24.22.2/11.19.1**. engines 24.x e .nvmrc 24.22.2 preservados. O shim npm/NVM não foi executado/reparado nesta tarefa. |
+| Baseline / suíte final | PASS: npm CLI independente **test -- --test-reporter=tap**, antes das edições **1266/1266**; final **1282/1282**, zero falhas/cancelamentos/skips/todo. 16 testes novos (14 pacote, 2 memória). Arquivos TAP em node_modules/.codebucket-p35/baseline-tests.log e final-tests.log. |
+| Sintaxe / formatação | PASS: node --check via stdin **67/67 JS** (63 anteriores + 2 scripts + 2 testes). Prettier --check nos quatro JS novos; entradas somente analisadas. |
+| Contratos / regressão | PASS: **23/23** JSON comparados aos builders de HEAD (também main no snapshot inicial), hash **e50cb9e0df937132bf0381b136a80cab6e46bdd0186f69490a825961b9d53f15** preservado. Nenhum execute real. git diff --exit-code nos comandos/lib/entradas/manifests/.nvmrc/assets/ADRs sem delta. |
+| Dry-run | PASS: **node deploy-commands.js --dry-run**, exit **0**, **23 comandos**, nenhum registro enviado e sem leitura de .env. |
+| Dependências | PASS: **85/85 versões** locais iguais ao lock; dependências/engines raiz coerentes. Sem dependência nova ou mudança de manifests/lock. |
+| Config / ignore / imports | PASS: **node scripts/discloud-package.js --check**; cinco campos exatos Free/candidato latest, ignore sem glob/barras finais, lock incluído, imports locais literais e dependências/arquivos/assets necessários conferidos. Análise estática conservadora exige revisão ao adicionar formas dinâmicas; não é prova de runtime remoto. |
+| ZIP efetivo | PASS: **node scripts/discloud-package.js --output dist/CodeBucket-preparation.zip**, **45 arquivos / 403427 bytes**: 5 raiz +23 comandos +14 lib +3 imagens. SHA-256 **39346632dbc280fba76af423c7bf880017eceb07b26807b1900b45cce9f77052**. ZIP STORE de raiz direta; --check e saída incluem inventário/tamanho/hash por arquivo. .NET System.IO.Compression abriu independentemente os 45 arquivos e comparou cada SHA-256 ao fonte; nenhum caminho de credencial/desenvolvimento presente. Testes confirmam CRC32, estrutura, determinismo, regras, ausências/imports, symlinks e segredo sintético recusado. |
+| Instalações a partir do ZIP | PASS: extração em duas cópias novas sem .env/node_modules prévios, node_modules/.codebucket-p35/ci-development e ci-production. npm ci **--offline --engine-strict --no-audit --no-fund --logs-max=0 --update-notifier=false**, --prefix por cópia, userconfig/globalconfig vazios e caches P3.2 correspondentes; produção **--omit=dev**. **85 pacotes/exit 0 em cada**. Em ambas: 85 versões, 23 contratos/hash, três assets e Prettier Babel aprovados; **1617 resoluções CJS/ESM por cópia**, restritas à própria instalação, zero tentativas proibidas. Caches reutilizados, não novos downloads; isso não valida instalação na Discloud. Resumo ci-validation.json. |
+| Credenciais / segurança | PASS no escopo verificável: .env não rastreado, .env/node_modules/dist ignorados pelo Git; pacote usa lista fechada e nunca considera/lê .env. Scan heurístico dos conteúdos não encontrou padrões convencionais; não prova ausência universal nem compara segredo real. ZIP privado autenticável não foi criado. |
+| Revisão independente | Empacotador e probe revisados separadamente; sem bloqueante concreto no snapshot. Guardas do probe protegem caminhos auditados, sem constituir sandbox universal de código não confiável. Nenhuma mudança especulativa de cache/recovery. |
+
+### Medição efetiva offline de memória
+
+Comando executado: **node scripts/discloud-memory.js**, Node v24.22.2, win32/x64, um processo novo e cinco snapshots. Evidência com revisão/data/fuso em node_modules/.codebucket-p35/memory.json. **Zero tentativas de rede, login, leitura de credenciais ou escrita pelo workload**. Catálogo carregado sem execute; Client sem login/caches vazios. Prettier recebe cinco entradas locais sintéticas; QR numérico de 5596 caracteres gera PNG em Buffer de **35585 bytes**. Não foram inventados dados de produção.
+
+| Estágio | RSS bytes | RSS MiB |
+| --- | ---: | ---: |
+| Baseline com guardas | 41611264 | 39,68 |
+| 23 comandos carregados | 83353600 | 79,49 |
+| Client Guilds vazio, sem login | 83648512 | 79,77 |
+| Cinco parsers Prettier aquecidos | 89608192 | 85,46 |
+| QR sintético grande | 97763328 | 93,23 |
+
+Último snapshot: heapUsed **36020336 bytes**, external **9421005**, arrayBuffers **5128845**; métricas se sobrepõem e não devem ser somadas. Não é pico absoluto/benchmark repetido, não mede cgroup/Linux, instalação/ready reais, caches dos 134 servidores, concorrência HTTP ou uptime. **KNOWN_RISK R19:** pouca margem observada para 100 MB, sem prova de viabilidade/inviabilidade operacional. Caches, intents, funcionalidades e limites permanecem inalterados. A medição real da hospedagem é pendente.
+
+Documentação revisada: **14 arquivos novos/alterados, sete Markdown, 222 links locais/26 âncoras**, UTF-8, diff/whitespace e padrões de credenciais em 18 arquivos incluindo quatro logs; resumo em node_modules/.codebucket-p35/doc-review.json. Uma verificação intermediária detectou acentos perdidos pelo encoding padrão do pipe PowerShell; corrigidos com saída UTF-8 explícita. O diff com autocrlf desativado também acusou CRLF como whitespace; finais de linha dos arquivos alterados normalizados para LF e ambos os checks repetidos com sucesso. Não houve mudança de lógica por esses ajustes. Inventários/validadores/TAPs/cópias de instalação são artefatos locais ignorados. ZIP sem credenciais em dist também ignorado. **Prontidão final BLOCKED** por runtime remoto; preparação offline concluída não fecha a P3.5 operacional nem significa bot online.
+
 ## Fechamento P3.3 e preparação P3.4 — 2026-11-23
 
 Base **develop/6478dabf9ed565136d079e06bacfae65f8f6bc2a**, árvore inicialmente limpa, runtime independente Node **24.22.2/npm 11.19.1**, Windows/PowerShell, America/Sao_Paulo. A preparação anterior P3.3 foi commitada; a documentação atual de fechamento permanece local. Não houve login adicional, encerramento/reinício de bot, registro global, deploy, mudança de credencial/servidor, commit/push ou merge nesta tarefa.

@@ -1,10 +1,24 @@
 # Estado atual do projeto
 
-Atualizado no **fechamento P3.3 e preparação P3.4 — 2026-11-23**, America/Sao_Paulo. Base **develop/6478dabf9ed565136d079e06bacfae65f8f6bc2a**, inicialmente limpa, P3.3 preparatória commitada/enviada. Fechamento local sem commit/push/merge. Comparações GitHub somente leitura confirmam as refs locais de develop/main; demais registros de fases abaixo são históricos. Evidências atuais e limites em [QUALITY_GATES](QUALITY_GATES.md).
+Atualizado na **P3.5 — 2026-11-28**, America/Sao_Paulo. Base **develop/4655fe3f0f7e7c3b06b164957a17ad74577e2e32**, inicialmente limpa. Main/develop e refs origin locais apontam ao merge PR #1; **P3.4 DONE**. Não houve nova consulta de refs remotas, commit/push/merge ou alteração da main. Evidências atuais em [QUALITY_GATES](QUALITY_GATES.md); registros anteriores abaixo são históricos.
+
+## P3.5 — preparação offline Discloud Free
+
+| Área | Estado verificado / limite |
+| --- | --- |
+| Arquivos | Criados discloud.config, .discloudignore, scripts/discloud-package.js, scripts/discloud-memory.js e tests/discloud-package.test.js e tests/discloud-memory.test.js. .gitignore passa a ignorar dist; manifests, comandos, lib, index e assets preservados. |
+| Configuração | NAME=CodeBucket, TYPE=bot, MAIN=index.js, RAM=100, VERSION=latest. Sem AUTORESTART, BUILD, START ou dependências novas. Campos documentados; compatibilidade remota não atestada. |
+| Runtime | Local Node 24.22.2/npm 11.19.1 executados. engines.node continua 24.x. **Deploy BLOCKED:** tabela oficial não lista 24 e latest não informa o major efetivo. Confirmação de Node 24.x na Discloud é requisito essencial. |
+| Pacote | Empacotamento reproduzível por allowlist, ZIP sem pasta externa e sem .env/node_modules/.git/docs/tests. Lock e três assets preservados. É artefato seguro de preparação, sem autenticação; lista efetiva e validação em qualidade. |
+| Memória | Probe offline mede RSS/heap do processo Windows sem login e com caches vazios, incluindo Prettier/QR sintéticos. Pouca margem observada; não certifica 100 MB com 134 guilds ou no Linux da Discloud. Ver [análise e procedimento](OPERATIONS.md#memória-e-recuperação). |
+| Segredos / operação | .env local não lido, modificado ou incluído em ZIP. Método privado documentado para o responsável. Nenhum bot iniciado/encerrado, login, envio de credenciais, upload, registro global ou persistência. Hospedagem efetiva NOT_CONFIRMED. |
+| Continuidade | **P3.5 IN_PROGRESS**, preparação local entregue; prontidão final **BLOCKED** até confirmar runtime. R18–R21 em riscos; R03/R09/R12/R15/R16/R17 continuam MITIGATED. Próximo passo é confirmação oficial do seletor Node 24, antes de qualquer transição autorizada. |
 
 A auditoria inicial usou o código-base `cea09b90889716b5b05139eaf06f8b0e858f179e`, então na `main`; esse é um registro histórico, não a branch de trabalho atual.
 
 ## Fechamento P3.3 e prontidão P3.4
+
+**Histórico de 2026-11-23:** a pendência de integração desta tabela foi superada pelo merge observado acima. Não descreve o checkout atual.
 
 | Fonte / área | Constatação e limite |
 | --- | --- |
@@ -64,7 +78,7 @@ CodeBucket é um bot de estudos de programação para Discord. [O comando autor]
 | `DONE` | P3.1: logger que lança/rejeita ou permanece pendente não interrompe presença, resposta, watchdog/cleanup ou retorno do registro e não repete PUT. Helper aceita log/warn/error e string não vazia bem formada até 500 UTF-16, sem controles ASCII/DEL; não transforma Error/objeto nem redige segredos arbitrários. Mensagens fixas e contagens validadas continuam responsabilidade dos produtores. |
 | `DONE` | P3.1: baseline **1097/1097**, final **1189/1189**, sanitização **103/103**, sintaxe **62/62**, Prettier 10 JS e contratos **23/23**/hash P0/HEAD preservados. 92 casos adicionados (42 helper, 12 runtime e 38 integração); 85 versões instaladas iguais ao lock, sem dependências novas. Suíte final repetida no fechamento de 14/11. |
 | `MITIGATED` | R17: exposições locais relevantes removidas e diagnósticos preservados; retenção, captura/acesso e logs históricos da hospedagem não identificada permanecem externos e `NOT_CONFIRMED`. Não há arquivo de log, persistência ou monitoramento externo; nenhum histórico foi consultado/apagado. A política está em [operações](OPERATIONS.md#política-de-logs-e-retenção--p31). Próxima recomendação: R12, em tarefa própria. |
-| `MISSING` | Cobertura funcional integral de handlers/integrações. R15 está `MITIGATED` pela suíte ampliada; não há script `start`, CI ou hospedagem versionada. |
+| `MISSING` | Cobertura funcional integral de handlers/integrações. R15 está `MITIGATED` pela suíte ampliada; não há script `start` ou CI; hospedagem efetiva ainda não validada (configuração Discloud versionável preparada na P3.5). |
 | `DONE` | Não persistir tarefas/timers/cooldowns é uma restrição arquitetural aceita, não recurso `MISSING`. Não há sincronização entre processos ou recuperação desse estado após falha de hospedagem; essas consequências são aceitas. Controle integral de contratos/quota externos permanece pendente em R16, separado da política de estado. |
 | `MITIGATED` | Ambiente P3.2: NVM 2.0.1-hotfix.6 agora lista Node 24.22.2 e 20.20.0; node pelo shim funciona. npm pelo shim é bloqueado NVM4306 (delegação não confiável); não se alterou confiança/global. Runtime oficial independente verificado fora de node_modules, Node 24.22.2/npm 11.19.1, permite checks e instalações isoladas. Área portátil P0 antiga está ausente. Procedimento atual em [operações](OPERATIONS.md). |
 | `DONE` | P3.2: identidade Discord e URLs configuráveis validadas em config.js; convite vinculado à interação/CLIENT_ID, scopes bot applications.commands e permissions=117824, sem fallback histórico. top.gg histórico preservado como página externa; Lofi HTTPS validado e delimitadores Markdown codificados. Campos link sem efeito da presença removidos, sem mudar intents. Matriz dos 23 comandos e runbook atualizados. |
